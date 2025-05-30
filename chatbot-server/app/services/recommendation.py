@@ -3,9 +3,10 @@ from app.db.models import Subscription
 from app.schemas.recommend import UserProfile
 
 RULES = {
-    ("10대", "OTT"): ["넷플릭스", "유튜브"],
+    ("10대", "OTT"): ["넷플릭스", "유튜브", "디즈니"],
     ("20대", "웹툰"): ["웹툰", "도서"],
     ("30대", "카페"): ["디저트", "편의점"],
+    ("40대", "키즈"): ["아이", "에듀"],
     ("애완견", "배달"): ["펫"]
 }
 

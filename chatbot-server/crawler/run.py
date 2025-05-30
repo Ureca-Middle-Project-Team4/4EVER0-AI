@@ -5,12 +5,11 @@ from selenium.webdriver.chrome.service import Service
 import time
 import os
 
-# 크롤링 1회만 실행되도록 체크 파일 설정
 FLAG_PATH = ".crawler_once_done"
 
 def crawl_udok_products():
     if os.path.exists(FLAG_PATH):
-        print("이미 크롤링 완료됨. 재실행 안함.")
+        print("✅ 이미 크롤링 완료됨. 재실행 안함.")
         return []
 
     url = "https://www.lguplus.com/pogg/category/전체상품"
@@ -31,6 +30,8 @@ def crawl_udok_products():
 
     all_products = []
     product_items = soup.select(".pg-prod-item")
+    print(f"🔍 Found {len(product_items)} items")
+
     for item in product_items:
         title_el = item.select_one(".pi-tit h4 span")
         if not title_el:
@@ -52,16 +53,18 @@ def crawl_udok_products():
         category = item.get("data-ec-category") or "unknown"
         category = category.replace("/", "_")
 
-        all_products.append({
+        product = {
             "title": title_text,
             "description": description,
             "image_url": image_url,
             "detail_url": detail_url,
             "category": category,
             "tags": tags
-        })
+        }
 
-    # 크롤링 1회 완료 플래그 생성
+        print("파싱 완료:", product)
+        all_products.append(product)
+
     with open(FLAG_PATH, "w") as f:
         f.write("done")
 
