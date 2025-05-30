@@ -5,6 +5,7 @@ from app.services.openai_service import ask_gpt
 router = APIRouter()
 
 @router.post("/", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    gpt_response = await ask_gpt(request.message)
+def chat(request: ChatRequest):
+    gpt_response = ask_gpt(request.message)
     return ChatResponse(response=gpt_response)
+
