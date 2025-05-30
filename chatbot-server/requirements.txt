@@ -1,0 +1,8 @@
+beautifulsoup4==4.12.2
+requests==2.31.0
+python-dotenv==1.0.1
+SQLAlchemy==2.0.30
+alembic==1.13.1
+fastapi==0.110.1
+uvicorn[standard]==0.29.0
+selenium==4.33.0
