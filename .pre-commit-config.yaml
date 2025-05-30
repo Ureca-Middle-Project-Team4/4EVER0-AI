@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: add-ticket-id
+        name: Add ticket ID from branch
+        entry: python3 scripts/commit_msg_hook.py
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
