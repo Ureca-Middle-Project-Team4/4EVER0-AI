@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 from typing import List
-from app.schemas.recommend import UserProfile, RecommendedItem
+from app.schemas.recommend import UserProfile, MultiTurnRequest, RecommendedItem
 from app.services.recommendation import get_recommendations
+from app.utils.redis_client import get_session, save_session
 
 router = APIRouter()
 
@@ -9,12 +10,20 @@ router = APIRouter()
 def recommend(user: UserProfile):
     return get_recommendations(user)
 
+@router.post("/multi-recommend", response_model=List[RecommendedItem])
+def multi_recommend(req: MultiTurnRequest):
+    session_id = req.session_id
+    session_state = get_session(session_id)
 
-# app/main.py 에 추가
-from fastapi import FastAPI
-from app.api import chat, recommend
+    # 누적 상태 업데이트
+    if req.age_group:
+        session_state["age_group"] = req.age_group
+    if req.interests:
+        session_state["interests"] = list(set(session_state.get("interests", []) + req.interests))
+    if req.time_usage:
+        session_state["time_usage"] = list(set(session_state.get("time_usage", []) + req.time_usage))
 
-app = FastAPI()
+    save_session(session_id, session_state)
 
-app.include_router(chat.router, prefix="/chat")
-app.include_router(recommend.router, prefix="/api")
+    user_profile = UserProfile(**session_state)
+    return get_recommendations(user_profile)
