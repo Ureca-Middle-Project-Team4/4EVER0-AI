@@ -11,5 +11,4 @@ class Subscription(Base):
     image_url = Column(String(512))
     detail_url = Column(String(512))
     category = Column(String(100), default="유독")
-    tags = Column(Text)
     price = Column(String(50))
