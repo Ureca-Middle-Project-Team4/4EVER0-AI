@@ -1,7 +1,10 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+
 from app.api.chat import router as chat_router
 from app.api.recommend import router as recommend_router
+from app.api.voice import router as voice_router  # 🎤 음성 관련 라우터 추가한 경우
 from crawler.parser import crawl_udok_products
 from app.db.database import SessionLocal, engine, Base
 from app.db.models import Subscription
@@ -31,8 +34,19 @@ async def lifespan(app: FastAPI):
     db.close()
     yield
 
-# lifespan 지정
+# FastAPI 인스턴스
 app = FastAPI(lifespan=lifespan)
 
+# CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # 프론트엔드 개발 서버 주소
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# API 라우터 등록
 app.include_router(chat_router, prefix="/chat")
 app.include_router(recommend_router, prefix="/api")
+app.include_router(voice_router, prefix="/api/voice")  # 🎤 음성 라우터도 등록했으면 포함
