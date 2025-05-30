@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from urllib.parse import quote
+import json
 import time
 import os
 
@@ -60,8 +60,17 @@ def crawl_udok_products():
             if image_url and not image_url.startswith("http"):
                 image_url = "https://www.lguplus.com" + image_url
 
-            encoded_title = quote(title_text.strip().replace(" ", "-"))
-            detail_url = f"https://www.lguplus.com/pogg/product/{encoded_title}" if title_text else ""
+            # try to extract product_id from embedded JSON or data-ec-product
+            data_product = item.select_one("[data-ec-product]")
+            product_id = None
+            if data_product:
+                try:
+                    product_info = json.loads(data_product.get("data-ec-product", "{}"))
+                    product_id = product_info.get("ecom_prd_id")
+                except json.JSONDecodeError:
+                    pass
+
+            detail_url = f"https://www.lguplus.com/pogg/product/{product_id}" if product_id else ""
 
             price_el = item.select_one(".p-prcs .prc")
             price = price_el.get_text(strip=True).replace("월", "").strip() if price_el else ""

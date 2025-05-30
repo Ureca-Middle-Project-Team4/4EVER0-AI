@@ -5,3 +5,9 @@ SQLAlchemy==2.0.30
 fastapi==0.110.1
 uvicorn[standard]==0.29.0
 selenium==4.33.0
+scikit-learn==1.4.2
+numpy==1.26.4
+scipy==1.13.0
+joblib==1.4.2
+threadpoolctl==3.5.0
+openai==1.9.0

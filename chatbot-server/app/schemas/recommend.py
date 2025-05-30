@@ -1,6 +1,7 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
+# Pydantic models
 class UserProfile(BaseModel):
     age_group: str
     interests: List[str]
@@ -11,3 +12,6 @@ class RecommendedItem(BaseModel):
     description: str
     image_url: str
     detail_url: str
+    price: str
+    reason: Optional[str] = None
+

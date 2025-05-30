@@ -1,10 +1,11 @@
 from fastapi import APIRouter
+from typing import List
 from app.schemas.recommend import UserProfile, RecommendedItem
 from app.services.recommendation import get_recommendations
 
 router = APIRouter()
 
-@router.post("/recommend", response_model=list[RecommendedItem])
+@router.post("/recommend", response_model=List[RecommendedItem])
 def recommend(user: UserProfile):
     return get_recommendations(user)
 
