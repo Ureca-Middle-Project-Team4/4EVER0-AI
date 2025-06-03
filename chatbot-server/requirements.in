@@ -1,0 +1,25 @@
+# chatbot-server/requirements.in
+
+# OpenAI 및 LangChain
+openai>=1.24.0,<2.0.0
+langchain==0.1.16
+langchain-openai==0.1.6
+
+# FastAPI 및 서버 관련
+fastapi
+uvicorn[standard]
+
+# DB 및 기타
+SQLAlchemy
+python-dotenv
+redis
+gTTS
+
+# ML 및 크롤링
+scikit-learn
+numpy
+scipy
+joblib
+requests
+beautifulsoup4
+selenium

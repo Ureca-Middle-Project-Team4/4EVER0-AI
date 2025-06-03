@@ -1,18 +1,28 @@
-beautifulsoup4==4.12.2
-requests==2.32.0
-python-dotenv==1.0.1
-SQLAlchemy==2.0.30
+# --- Core AI SDKs ---
+openai==1.25.0
+langchain==0.1.16
+langchain-openai==0.1.6
+
+# --- Web Framework ---
 fastapi==0.110.1
 uvicorn[standard]==0.29.0
-selenium==4.33.0
+
+# --- Database ---
+SQLAlchemy==2.0.30
+
+# --- ML/NLP ---
 scikit-learn==1.4.2
 numpy==1.26.4
 scipy==1.13.0
 joblib==1.4.2
 threadpoolctl==3.5.0
-openai==1.9.0
-gTTS==2.3.2
-redis==6.2.0
-langchain==0.3.25
-langchain-openai==0.3.18
 
+# --- Crawling / Web Automation ---
+beautifulsoup4==4.12.2
+requests==2.32.0
+selenium==4.33.0
+
+# --- Utilities ---
+python-dotenv==1.0.1
+redis==6.2.0
+gTTS==2.3.2
