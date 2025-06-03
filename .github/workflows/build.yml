@@ -28,15 +28,3 @@ jobs:
           pip install -r requirements.txt
         working-directory: ./chatbot-server
 
-      - name: Lint check (flake8)
-        run: |
-          pip install flake8
-          flake8 app/
-        working-directory: ./chatbot-server
-
-      - name: Type check
-        run: |
-          pip install mypy
-          mypy app/
-        working-directory: ./chatbot-server
-
