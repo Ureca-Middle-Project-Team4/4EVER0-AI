@@ -2,16 +2,11 @@ import redis
 import json
 import os
 
-r = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    decode_responses=True
-)
+client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
 def get_session(session_id: str) -> dict:
-    data = r.get(session_id)
+    data = client.get(session_id)
     return json.loads(data) if data else {}
 
-# 1800초 = 30분동안 유지
-def save_session(session_id: str, state: dict, ttl: int = 1800):
-    r.setex(session_id, ttl, json.dumps(state))
+def save_session(session_id: str, data: dict):
+    client.set(session_id, json.dumps(data))

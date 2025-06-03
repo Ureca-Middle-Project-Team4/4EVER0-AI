@@ -1,11 +1,11 @@
 from fastapi import APIRouter
-from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.openai_service import ask_gpt
+from fastapi.responses import StreamingResponse
+from app.schemas.chat import ChatRequest
+from app.services.handle_chat import handle_chat
 
 router = APIRouter()
 
-@router.post("/", response_model=ChatResponse)
-def chat(request: ChatRequest):
-    gpt_response = ask_gpt(request.message)
-    return ChatResponse(response=gpt_response)
-
+@router.post("/chat")
+async def chat(req: ChatRequest):
+    stream_fn = await handle_chat(req)
+    return StreamingResponse(stream_fn(), media_type="text/plain")

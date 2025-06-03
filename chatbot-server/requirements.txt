@@ -12,4 +12,7 @@ joblib==1.4.2
 threadpoolctl==3.5.0
 openai==1.9.0
 gTTS==2.3.2
+redis==6.2.0
+langchain==0.3.25
+langchain-openai==0.3.18
 
