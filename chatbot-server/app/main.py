@@ -6,6 +6,7 @@ from app.api.recommend import router as recommend_router
 from crawler.parser import crawl_udok_products
 from app.db.database import SessionLocal, engine, Base
 from app.db.models import Subscription
+from app.api.ubti import router as ubti_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,3 +48,4 @@ app.add_middleware(
 # API 라우터 등록
 app.include_router(chat_router, prefix="/api")
 app.include_router(recommend_router, prefix="/api")
+app.include_router(ubti_router, prefix="/api")

@@ -14,6 +14,10 @@ async def detect_intent(message: str, user_context: dict = None) -> str:
     if any(k in lowered for k in ["구독", "넷플릭스", "멜론", "유튜브프리미엄", "ott", "디즈니"]):
         return "subscription_recommend"
 
+    if any(k in lowered for k in ["ubti", "mbti", "통신 성향", "통신 mbti", "ubti 검사", "ubti 테스트"]):
+        return "ubti_recommend"
+
+
     # 요금제 멀티턴 판단
     if "추천" in lowered and any(k in lowered for k in ["요금제", "플랜"]):
         specific_conditions = ["데이터", "통화", "무제한", "만원", "저렴", "비싼", "GB", "유튜브", "SNS"]
