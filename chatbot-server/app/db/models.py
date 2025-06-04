@@ -28,7 +28,7 @@ class UBType(Base):
     __tablename__ = "ubti_types"
 
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(10), unique=True, nullable=False)        # ✅ 길이 지정
-    name = Column(String(50), nullable=False)                     # ✅
-    emoji = Column(String(10))                                    # ✅
-    description = Column(String(255), nullable=False)
+    code = Column(String(10), unique=True, nullable=False)
+    name = Column(String(50), nullable=False)
+    emoji = Column(String(10))
+    description = Column(Text, nullable=False)

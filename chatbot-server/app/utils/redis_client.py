@@ -1,4 +1,3 @@
-# app/utils/redis_client.py
 import redis
 import json
 
@@ -9,7 +8,11 @@ def get_session(session_id: str) -> dict:
     return json.loads(data) if data else {}
 
 def save_session(session_id: str, data: dict):
-    client.set(session_id, json.dumps(data))
+    try:
+        client.set(session_id, json.dumps(data), ex=1800)  # 30분 TTL 적용 (만료 시간)
+    except Exception as e:
+        print(f"Redis 저장 실패: {e}")
+
 
 def delete_session(session_id: str):
     client.delete(session_id)
