@@ -1,8 +1,8 @@
+# app/utils/redis_client.py
 import redis
 import json
-import os
 
-client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+client = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 def get_session(session_id: str) -> dict:
     data = client.get(session_id)
@@ -10,3 +10,6 @@ def get_session(session_id: str) -> dict:
 
 def save_session(session_id: str, data: dict):
     client.set(session_id, json.dumps(data))
+
+def delete_session(session_id: str):
+    client.delete(session_id)
