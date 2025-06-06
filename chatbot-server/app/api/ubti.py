@@ -43,10 +43,10 @@ async def ubti_chat(req: UBTIRequest):
             f"{u.emoji} **{u.code} ({u.name})**  - {u.description}" for u in ubti_types
         ])
 
-        # 요금제 정보도 활용 가능 (추후 추천 고도화)
+        # 요금제 정보 참조
         plans = get_all_plans()
         plans_text = "\n".join([
-            f"- {p.name} (월 {p.price}) – {p.description or '설명 없음'}"
+            f"- {p.name} / {p.price}원 / {p.data or '-'} / {p.speed or '-'} / 공유:{p.share_data or '-'} / 통화:{p.voice or '-'} / 문자:{p.sms or '-'}"
             for p in plans
         ])
 

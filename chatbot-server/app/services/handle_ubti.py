@@ -21,7 +21,7 @@ async def handle_ubti_chat(req: UBTIRequest) -> str:
     try:
         plans = get_all_plans()
         plans_text = "\n".join([
-            f"- {p.name} (월 {p.price}) – {p.description or '설명 없음'}"
+            f"- {p.name} / {p.price}원 / {p.data or '-'} / {p.speed or '-'} / 공유:{p.share_data or '-'} / 통화:{p.voice or '-'} / 문자:{p.sms or '-'}"
             for p in plans
         ])
     except Exception as e:
