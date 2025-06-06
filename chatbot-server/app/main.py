@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.api.chat import router as chat_router
-from app.api.recommend import router as recommend_router
 from crawler.parser import crawl_udok_products
 from app.db.database import SessionLocal, engine, Base
 from app.db.models import Subscription
@@ -47,5 +46,4 @@ app.add_middleware(
 
 # API 라우터 등록
 app.include_router(chat_router, prefix="/api")
-app.include_router(recommend_router, prefix="/api")
 app.include_router(ubti_router, prefix="/api")
