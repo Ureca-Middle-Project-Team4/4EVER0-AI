@@ -62,23 +62,21 @@ def get_chain_by_intent(intent: str, req: ChatRequest) -> Callable[[], Awaitable
 
     elif intent == "subscription_recommend":
         from app.db.subscription_db import get_products_from_db
-        products = get_products_from_db()
-        product_data = [
-            {
-                "title": p.title,
-                "category": p.category,
-                "price": p.price,
-                "image_url": p.image_url,
-                "type": "main" if p.title in ["유튜브 프리미엄", "디즈니+", "지니", "리디북스", "재담쇼츠"] else "life"
-            }
-            for p in products
-        ]
-        main_items = [p for p in product_data if p["type"] == "main"]
-        life_items = [p for p in product_data if p["type"] == "life"]
+        from app.db.brand_db import get_life_brands_from_db
 
-        # ✅ 문자열 변환
-        context["main"] = "\n".join([f"- {p['title']} ({p['category']}) - {p['price']}원" for p in main_items])
-        context["life"] = "\n".join([f"- {p['title']} ({p['category']}) - {p['price']}원" for p in life_items])
+        # 1. 메인 구독 상품 전체 조회
+        main_items = get_products_from_db()
+
+        # 2. 라이프 브랜드 전체 조회
+        life_items = get_life_brands_from_db()
+
+        # 3. LangChain 컨텍스트에 문자열로 포맷
+        context["main"] = "\n".join([
+            f"- {p.title} ({p.category}) - {p.price}원" for p in main_items
+        ])
+        context["life"] = "\n".join([
+            f"- {b.name}" for b in life_items
+        ])
 
 
     prompt = get_prompt_template(intent)

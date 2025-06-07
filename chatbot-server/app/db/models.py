@@ -9,9 +9,14 @@ class Subscription(Base):
     image_url = Column(Text, nullable=False)
     category = Column(String(100), nullable=False)
     price = Column(Integer, nullable=False)
-    type = Column(Enum("main", "life", name="subscription_type"), nullable=False)
 
+class Brand(Base):
+    __tablename__ = "brands"
 
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    image_url = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
 
 class Plan(Base):
     __tablename__ = "plans"
