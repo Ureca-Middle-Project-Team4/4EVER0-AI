@@ -1,6 +1,17 @@
-# app/schemas/ubti.py
 from pydantic import BaseModel
+from typing import Optional, Union
 
 class UBTIRequest(BaseModel):
     session_id: str
-    message: str  # 성향 분석용 단일 응답만 받음
+    message: Optional[str] = None
+
+class UBTIQuestion(BaseModel):
+    question: str
+    step: int
+
+class UBTIResult(BaseModel):
+    message: str
+
+class UBTIComplete(BaseModel):
+    completed: bool = True
+    message: str = "모든 질문이 완료되었습니다."
