@@ -7,6 +7,7 @@ from app.utils.redis_client import get_session, save_session, delete_session
 from app.prompts.ubti_prompt import get_ubti_prompt
 from app.db.ubti_types_db import get_all_ubti_types
 from app.db.plan_db import get_all_plans
+from app.db.subscription_db import get_products_from_db
 from app.utils.langchain_client import get_chat_model
 import json
 import asyncio
@@ -68,11 +69,19 @@ async def final_result(req: UBTIRequest):
     # UBTI 유형 & 요금제 정보 로드
     ubti_types = get_all_ubti_types()
     plans = get_all_plans()
+    subscriptions = get_products_from_db()
+
+    subs_text = "\n".join([
+        f"- {s.title}: {s.category}" for s in subscriptions
+    ])
+
     prompt = get_ubti_prompt().format(
         message="\n".join(session["answers"]),
-        ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),  # ✅ 추가
-        plans="\n".join(p.name for p in plans)
+        ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),
+        plans="\n".join(p.name for p in plans),
+        subscriptions=subs_text
     )
+
 
 
 

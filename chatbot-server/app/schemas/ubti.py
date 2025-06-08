@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Union, Dict
+from typing import Optional, Union, Dict, List
 
 class PlanOrSubscription(BaseModel):
     name: str
@@ -9,6 +9,11 @@ class Recommendation(BaseModel):
     plan: PlanOrSubscription
     subscription: PlanOrSubscription
 
+class MatchingType(BaseModel):
+    code: str
+    name: str
+    emoji: str
+    reason: str
 
 class UBTIType(BaseModel):
     code: str
@@ -28,6 +33,7 @@ class UBTIResult(BaseModel):
     ubti_type: UBTIType
     summary: str
     recommendation: Recommendation
+    matching_type: UBTIType
 
 class UBTIComplete(BaseModel):
     completed: bool = True
