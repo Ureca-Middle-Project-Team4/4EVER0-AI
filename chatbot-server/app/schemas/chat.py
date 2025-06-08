@@ -5,3 +5,6 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     persona: Optional[str] = "default"
+
+class LikesChatRequest(BaseModel):
+    session_id: str

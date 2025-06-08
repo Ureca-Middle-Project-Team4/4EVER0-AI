@@ -15,3 +15,4 @@ class UBTIResult(BaseModel):
 class UBTIComplete(BaseModel):
     completed: bool = True
     message: str = "모든 질문이 완료되었습니다."
+
