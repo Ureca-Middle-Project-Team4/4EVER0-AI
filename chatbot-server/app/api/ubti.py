@@ -20,6 +20,7 @@ UBTI_QUESTIONS = [
     "통신비 예산은 어느 정도가 적절하다고 생각하시나요?"
 ]
 
+
 @router.post(
     "/ubti/question",
     summary="다음 UBTI 질문 스트리밍 또는 완료 안내",
@@ -29,24 +30,24 @@ async def next_question(req: UBTIRequest):
     session_id = f"ubti_session:{req.session_id}"
     session = get_session(session_id)
 
+    # 세션이 없으면 초기화하고 0번 질문 반환
     if not session:
         session = {"step": 0, "answers": []}
         save_session(session_id, session)
+        return UBTIQuestion(question=UBTI_QUESTIONS[0], step=0)
 
-    # 답변이 왔다면 저장하고 step 증가
+    # 답변이 왔으면 저장하고 step 증가
     if req.message is not None:
         session["answers"].append(req.message)
         session["step"] += 1
         save_session(session_id, session)
 
     step = session["step"]
-
-    # 질문 완료 시 완료 안내 반환 (200 OK)
     if step >= len(UBTI_QUESTIONS):
         return UBTIComplete()
 
-    # 아직 질문이 남았다면 해당 질문 반환
     return UBTIQuestion(question=UBTI_QUESTIONS[step], step=step)
+
 
 
 @router.post(
@@ -69,14 +70,20 @@ async def final_result(req: UBTIRequest):
     plans = get_all_plans()
     prompt = get_ubti_prompt().format(
         message="\n".join(session["answers"]),
-        ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),
+        ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),  # ✅ 추가
         plans="\n".join(p.name for p in plans)
     )
 
-    # LLM 호출해서 스트리밍으로 받고 합침
+
+
     model = get_chat_model()
     full = ""
     async for chunk in model.astream(prompt):
         full += chunk.content
 
-    return UBTIResult(message=full)
+    try:
+        parsed = json.loads(full)
+        return UBTIResult(**parsed)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
+

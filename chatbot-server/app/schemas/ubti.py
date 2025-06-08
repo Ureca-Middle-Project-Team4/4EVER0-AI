@@ -1,5 +1,20 @@
 from pydantic import BaseModel
-from typing import Optional, Union
+from typing import Optional, Union, Dict
+
+class PlanOrSubscription(BaseModel):
+    name: str
+    description: str
+
+class Recommendation(BaseModel):
+    plan: PlanOrSubscription
+    subscription: PlanOrSubscription
+
+
+class UBTIType(BaseModel):
+    code: str
+    name: str
+    emoji: str
+    description: str
 
 class UBTIRequest(BaseModel):
     session_id: str
@@ -10,7 +25,9 @@ class UBTIQuestion(BaseModel):
     step: int
 
 class UBTIResult(BaseModel):
-    message: str
+    ubti_type: UBTIType
+    summary: str
+    recommendation: Recommendation
 
 class UBTIComplete(BaseModel):
     completed: bool = True
