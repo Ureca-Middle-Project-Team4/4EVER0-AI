@@ -1,5 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Enum, ForeignKey, Boolean, DateTime
 from app.db.database import Base
+from datetime import datetime, timedelta, timezone
+
+KST = timezone(timedelta(hours=9))  # 한국 시간대 정의
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
@@ -9,9 +12,14 @@ class Subscription(Base):
     image_url = Column(Text, nullable=False)
     category = Column(String(100), nullable=False)
     price = Column(Integer, nullable=False)
-    type = Column(Enum("main", "life", name="subscription_type"), nullable=False)
 
+class Brand(Base):
+    __tablename__ = "brands"
 
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    image_url = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
 
 class Plan(Base):
     __tablename__ = "plans"
@@ -35,3 +43,13 @@ class UBType(Base):
     name = Column(String(50), nullable=False)
     emoji = Column(String(10))
     description = Column(Text, nullable=False)
+
+class CouponLike(Base):
+    __tablename__ = "coupon_likes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    coupon_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, nullable=False)
+    brand_id = Column(Integer, nullable=False)
+    is_liked = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(KST))
