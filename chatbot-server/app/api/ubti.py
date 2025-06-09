@@ -10,6 +10,7 @@ from app.db.plan_db import get_all_plans
 from app.db.subscription_db import get_products_from_db
 from app.utils.langchain_client import get_chat_model
 import json
+from fastapi.responses import JSONResponse
 import asyncio
 
 router = APIRouter()
@@ -90,9 +91,30 @@ async def final_result(req: UBTIRequest):
     async for chunk in model.astream(prompt):
         full += chunk.content
 
+<<<<<<< HEAD
     try:
         parsed = json.loads(full)
         return UBTIResult(**parsed)
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
 
+=======
+<<<<<<< Updated upstream
+    return UBTIResult(message=full)
+=======
+    try:
+        parsed = json.loads(full)
+        result = UBTIResult(**parsed)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": 200,
+                "message": "요청 성공",
+                "data": result.dict()
+            }
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
+
+>>>>>>> Stashed changes
+>>>>>>> 171cffe (Fix: [EVER-105] JSON 단일 객체 버그 수정)
