@@ -83,25 +83,11 @@ async def final_result(req: UBTIRequest):
         subscriptions=subs_text
     )
 
-
-
-
     model = get_chat_model()
     full = ""
     async for chunk in model.astream(prompt):
         full += chunk.content
 
-<<<<<<< HEAD
-    try:
-        parsed = json.loads(full)
-        return UBTIResult(**parsed)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
-
-=======
-<<<<<<< Updated upstream
-    return UBTIResult(message=full)
-=======
     try:
         parsed = json.loads(full)
         result = UBTIResult(**parsed)
@@ -116,5 +102,3 @@ async def final_result(req: UBTIRequest):
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
 
->>>>>>> Stashed changes
->>>>>>> 171cffe (Fix: [EVER-105] JSON 단일 객체 버그 수정)
