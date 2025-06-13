@@ -1,49 +1,293 @@
-📡 LG U+ 요금제 & 구독 추천 시스템 – AI 기반 라이프스타일 큐레이션
+# 📡 Template-based LangChain System AI by MoonuZ
 
-U+ 요금제/구독 서비스를 사용자 성향에 맞춰 자동 추천해주는 AI 기반 대화 시스템입니다.
-GPT API + LangChain + FastAPI + Redis 조합으로 멀티턴 대화 처리 및 유저 맞춤형 응답을 제공합니다.
+AI 기반 라이프스타일 큐레이션 플랫폼 **MoonuZ**를 위해 LG U+ 요금제/구독 서비스를 사용자 성향에 맞춰 자동 추천해주는 **Template-based LangChain System AI 대화 시스템**입니다.
 
+OpenAI + LangChain + FastAPI + Redis로 **4단계 멀티턴 대화** 처리 및 **톤별 캐릭터 응답**을 제공합니다.
 
 ## 🧱 Tech Stack
 
-| 항목        | 내용                         |
-| --------- | -------------------------- |
-| Language  | Python 3.9                 |
-| Framework | FastAPI                    |
-| AI Engine | OpenAI GPT (gpt-4o)        |
-| Pipeline  | LangChain, Redis 기반 세션 관리  |
-| ORM / DB  | SQLAlchemy (ORM), MySQL    |
-| 환경 관리     | .env, python-dotenv        |
-| 백엔드 연동    | Spring Boot (RestTemplate) |
-| 구조화       | LangChain 체인 구성 및 프롬프트 설계  |
-| 세션 저장     | Redis (TTL 1800초)          |
+| 항목 | 내용 |
+|------|------|
+| **Language** | Python 3.9 |
+| **Framework** | FastAPI |
+| **AI Engine** | OpenAI GPT (gpt-4o) |
+| **AI Pipeline** | **LangChain Template-based Chain** |
+| **Session Management** | Redis (TTL 1800초) |
+| **ORM / DB** | SQLAlchemy (ORM), MySQL |
+| **환경 관리** | .env, python-dotenv |
+| **백엔드 연동** | Spring Boot (RestTemplate) |
+| **구조화** | 정적 프롬프트 템플릿 + 인텐트 라우팅 |
 
+## 🎯 시스템 아키텍처
 
-## 🔍 주요 기능
+### **Template-based Conversational AI 구조**
 
-### 1. 📱 요금제 멀티턴 추천 (`POST /api/chat`, intent: `phone_plan_multi`)
+```mermaid
+graph TD
+    A[사용자 메시지] --> B[인텐트 감지]
+    B --> C{인텐트 분류}
+    
+    C -->|phone_plan_multi| D[요금제 4단계 멀티턴]
+    C -->|subscription_recommend| E[구독 단일 추천]
+    C -->|subscription_likes| F[좋아요 기반 추천]
+    C -->|ubti_recommend| G[UBTI 성향 분석]
+    
+    D --> H[정적 프롬프트 템플릿 선택]
+    E --> H
+    F --> H
+    G --> H
+    
+    H --> I[LangChain ChatPromptTemplate]
+    I --> J[GPT-4o 응답 생성]
+    J --> K[스트리밍 응답]
+    
+    subgraph "Redis 세션 관리"
+        L[멀티턴 상태]
+        M[사용자 정보]
+        N[대화 히스토리]
+    end
+    
+    D -.-> L
+    D -.-> M
+    K -.-> N
+```
 
-* **4단계 질문 흐름**을 통해 사용자의 데이터, 통화, 서비스 선호, 예산 정보를 수집
-* 수집된 정보를 기반으로 LangChain Prompt → GPT 모델로 최적 요금제 추천
-* Redis를 통한 세션 기반 대화 유지
+### **핵심 특징: Rule-driven Template System**
 
-### 2. ☕ 구독 싱글턴 추천 (`POST /api/chat`, intent: `subscription_recommend`)
+- ✅ **정적 프롬프트**: 미리 정의된 템플릿 기반 응답 생성
+- ✅ **인텐트 라우팅**: 사용자 메시지 → 적절한 체인 선택
+- ✅ **멀티턴 플로우**: 4단계 강제 질문으로 정보 수집
+- ✅ **톤별 캐릭터**: general(상담원) vs muneoz(무너) 응답 스타일
 
-* **관심 분야 / 사용 스타일 / 예산**을 기반으로 단일 응답 생성
-* 유저 입력 기반 의도 감지 → 메인 + 라이프 구독 조합 추천
-* 예: 유튜브 프리미엄 + 스타벅스 커피쿠폰 (유독픽)
+## 🔍 주요 기능 및 API 플로우
 
-### 3. 💜 좋아요 기반 구독 추천 (`POST /api/chat/likes`)
+### 1. 📱 **요금제 멀티턴 추천** (`POST /api/chat`)
 
-* 사용자가 좋아요한 브랜드(예: 메가커피, CU 등)를 기반으로 구독 조합 추천
-* **메인 구독 + 라이프 브랜드**의 조합을 자연어로 안내
-* LG U+ 캐릭터 ‘무너’의 친근한 어투로 맞춤 추천 응답
+**Intent:** `phone_plan_multi`
 
-### 4. 🍡 타코야키 성향 테스트 (UBTI) (POST /api/ubti/question, POST /api/ubti/result)
-- 사용자는 4가지 자연어 질문에 자유롭게 답변 
-- 답변 내용을 기반으로 UBTI 8가지 타입 중 하나를 AI가 분석하여 추천 
-- 추천 결과는 JSON 형식으로 반환되어, 프론트엔드에서는 카드형 UI로 활용 가능
+```mermaid
+sequenceDiagram
+    participant User as 사용자
+    participant API as FastAPI
+    participant Redis as Redis
+    participant Chain as LangChain
+    participant GPT as GPT-4o
 
+    User->>API: "요금제 추천해줘" (tone: general/muneoz)
+    API->>Redis: 세션 상태 확인
+    Redis-->>API: step: 0 (새 시작)
+    
+    Note over API: 4단계 강제 플로우 시작
+    
+    API->>Chain: 1단계 질문 템플릿 로드
+    Chain-->>API: "데이터는 얼마나 사용하시나요?"
+    API->>User: 스트리밍 응답 (0.05초/단어)
+    
+    User->>API: "무제한으로 쓰고 싶어요"
+    API->>Redis: step: 1, data_usage 저장
+    API->>Chain: 2단계 질문 템플릿
+    Chain-->>API: "통화는 얼마나 사용하시나요?"
+    API->>User: 스트리밍 응답
+    
+    Note over API,Redis: 3단계, 4단계 반복...
+    
+    User->>API: "3만원 정도" (4단계 완료)
+    API->>Redis: 모든 정보 수집 완료
+    Redis-->>API: user_info: {data, call, service, budget}
+    
+    API->>Chain: 최종 추천 프롬프트 템플릿
+    Chain->>GPT: 프롬프트 + 사용자 정보
+    GPT-->>Chain: 맞춤 요금제 추천
+    Chain-->>API: 최종 응답
+    API->>User: 스트리밍 응답 (0.01초/청크)
+    API->>Redis: 세션 초기화
+```
+
+**4단계 질문 플로우:**
+1. **데이터 사용량**: "5GB, 무제한, 많이 사용해요"
+2. **통화 사용량**: "거의 안해요, 1시간 정도, 많이 해요"  
+3. **서비스 사용**: "유튜브, 게임, SNS, 업무용"
+4. **예산 범위**: "3만원대, 5만원 이하"
+
+### 2. ☕ **구독 단일 추천** (`POST /api/chat`)
+
+**Intent:** `subscription_recommend`
+
+```mermaid
+graph LR
+    A[사용자 메시지] --> B[인텐트: subscription_recommend]
+    B --> C[구독 추천 프롬프트 템플릿]
+    C --> D[메인 구독 + 라이프 조합]
+    D --> E[단일 응답 생성]
+    
+    subgraph "프롬프트 구조"
+        F[사용자 관심사]
+        G[메인 구독 DB]
+        H[라이프 구독 DB]
+    end
+    
+    C --> F
+    C --> G
+    C --> H
+```
+
+**응답 예시:**
+```
+고객님의 관심사를 보니 음악과 커피를 좋아하시는군요! 😊
+
+✅ 추천 메인 구독
+• 지니뮤직 - 9,900원
+→ 무제한 음악 스트리밍으로 취향저격!
+
+✅ 추천 라이프 구독  
+• 스타벅스 쿠폰
+→ 음악 들으며 카페 시간 완벽 조합!
+```
+
+### 3. 💜 **좋아요 기반 추천** (`POST /api/chat/likes`)
+
+```mermaid
+flowchart TD
+    A[좋아요 브랜드 입력] --> B[브랜드 분석]
+    B --> C[라이프스타일 패턴 매칭]
+    C --> D[메인 구독 선별]
+    D --> E[브랜드 연계 추천]
+    E --> F[조합 응답 생성]
+    
+    subgraph "추천 로직"
+        G[스타벅스 → 음악/독서]
+        H[올리브영 → 뷰티/라이프]
+        I[CGV → 영화/엔터]
+    end
+    
+    C --> G
+    C --> H
+    C --> I
+```
+
+### 4. 🍡 **UBTI 성향 분석** (`POST /api/ubti/question`, `POST /api/ubti/result`)
+
+```mermaid
+graph TD
+    A[UBTI 시작] --> B[자유 질문 4개]
+    B --> C[사용자 답변 수집]
+    C --> D[GPT 성향 분석]
+    D --> E[8가지 타입 매칭]
+    E --> F[요금제 2개 + 구독 1개]
+    F --> G[JSON 응답]
+    
+    subgraph "UBTI 타입들"
+        H[TK-Berry: 꾸안꾸 소셜타코]
+        I[TK-Milky: 느긋한 라이트타코]
+        J[TK-Eggy: 집콕 마요타코]
+        K[기타 5가지...]
+    end
+    
+    E --> H
+    E --> I
+    E --> J
+    E --> K
+```
+
+## 🎭 톤별 캐릭터 시스템
+
+> 챗봇 이용시 톤을 설정할 수 있습니다!
+
+### **general vs muneoz 톤 비교**
+
+| 구분 | General (상담원 스타일) | Muneoz (MZ 스타일) |
+|------|------------------|---------------|
+| **말투** | 정중한 존댓말 | MZ세대 반말 |
+| **호칭** | "고객님" | "너", "친구" |
+| **이모지** | 😊📱✅ | 🐙🤟💜🔥✨ |
+| **응답 스타일** | 전문적, 친절 | MZ, 트렌디 |
+
+**톤별 응답 예시:**
+```javascript
+// General 톤
+{
+  "message": "요금제 추천해줘",
+  "tone": "general"
+}
+// 응답: "안녕하세요, 고객님! 😊 데이터는 얼마나 사용하시나요?"
+
+// Muneoz 톤  
+{
+  "message": "요금제 추천해줘",
+  "tone": "muneoz"
+}
+// 응답: "안뇽! 🤟 나는 무너야~ 🐙 데이터 얼마나 쓰는 편이야?"
+```
+
+## 📊 프롬프트 템플릿 구조
+
+### **Template-based Chain 동작 원리**
+
+> 인텐트별로 구분: 인텐트는 챗봇이나 앱에서 사용자의 요청을 이해하고 처리하기 위한 목적이나 의도를 의미합니다. 
+`intent.py`에서 LLM은 해당 사용자의 발화 의도가 무엇인지에 따라 어떤 역할을 수행해야 할 지 생각합니다.
+
+```python
+# 1. 인텐트별 프롬프트 템플릿 정의
+PLAN_PROMPTS = {
+    "phone_plan_multi": {
+        "general": """당신은 LG유플러스 요금제 전문가입니다.
+        [수집된 사용자 정보] {user_info}
+        [요금제 목록] {plans}
+        추천해주세요.""",
+        
+        "muneoz": """야! 나는 요금제 추천하는 무너야! 🤟
+        [네가 말해준 정보] {user_info}  
+        [요금제들] {plans}
+        완전 찰떡인 거 추천해줄게~"""
+    }
+}
+
+# 2. LangChain 템플릿 생성
+from langchain_core.prompts import ChatPromptTemplate
+
+def get_prompt_template(intent: str, tone: str):
+    prompt_text = PLAN_PROMPTS[intent][tone]
+    return ChatPromptTemplate.from_template(prompt_text)
+
+# 3. 체인 실행
+chain = prompt_template | llm
+response = await chain.astream(context)
+```
+
+## 🔧 Redis 세션 관리
+
+### **멀티턴 상태 저장 구조**
+
+```json
+{
+  "session_id": "user_123",
+  "history": [
+    {"role": "user", "content": "요금제 추천해줘"},
+    {"role": "assistant", "content": "데이터 얼마나 쓰는 편이야? 🤟"}
+    ...
+  ]
+}
+```
+
+### **세션 라이프사이클**
+
+```mermaid
+stateDiagram-v2
+    [*] --> 새세션생성
+    새세션생성 --> 멀티턴시작
+    멀티턴시작 --> 1단계질문
+    1단계질문 --> 2단계질문
+    2단계질문 --> 3단계질문
+    3단계질문 --> 4단계질문
+    4단계질문 --> 최종추천
+    최종추천 --> 세션초기화
+    세션초기화 --> [*]
+    
+    note right of 멀티턴시작
+        Redis TTL: 30분
+        4단계 플로우 진행
+    end note
+```
 
 ## 🚀 실행 방법
 
@@ -62,14 +306,16 @@ pip install -r requirements.txt
 # 4. .env 설정
 echo "OPENAI_API_KEY=sk-xxxxxxxxxxxx" > .env
 
-# 5. 서버 실행
-uvicorn app.main:app --reload
+# 5. Redis 실행 (Docker)
+docker run -d -p 6379:6379 redis:alpine
+
+# 6. 서버 실행
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-* 📄 [Swagger Docs](http://localhost:8000/docs)
-* 📄 [ReDoc Docs](http://localhost:8000/redoc)
-
----
+**📄 API 문서:**
+- [Swagger Docs](http://localhost:8000/docs)
+- [ReDoc Docs](http://localhost:8000/redoc)
 
 ## 📁 폴더 구조
 
@@ -77,29 +323,127 @@ uvicorn app.main:app --reload
 chatbot-server/
 ├── app/
 │   ├── api/              # FastAPI 라우터
-│   ├── chains/           # 요금제/구독/UBTI 체인
-│   ├── db/               # 요금제/구독 상품 mock DB
-│   ├── prompts/          # LangChain prompt 템플릿
-│   ├── schemas/          # Request / Response 모델
-│   ├── services/         # intent → chain 라우팅
-│   ├── utils/            # Redis 세션, 유틸 함수
-│   └── main.py           # FastAPI entrypoint
+│   │   ├── chat.py       # 채팅/추천 API
+│   │   └── ubti.py       # UBTI 성향 분석 API
+│   ├── chains/           # LangChain 체인 구성
+│   │   ├── chat_chain.py # 멀티턴 체인 로직
+│   │   └── ubti_chain.py # UBTI 분석 체인
+│   ├── db/               # Mock 데이터베이스
+│   │   ├── plans.py      # 요금제 정보
+│   │   └── subscriptions.py # 구독 서비스 정보
+│   ├── prompts/          # 정적 프롬프트 템플릿
+│   │   ├── base_prompt.py     # 기본 톤별 템플릿
+│   │   ├── plan_prompt.py     # 요금제 추천 템플릿
+│   │   ├── subscription_prompt.py # 구독 추천 템플릿
+│   │   └── ubti_prompt.py     # UBTI 분석 템플릿
+│   ├── schemas/          # Request/Response 모델
+│   ├── services/         # 비즈니스 로직
+│   │   ├── intent.py     # 인텐트 감지
+│   │   └── handle_chat.py # 채팅 플로우 관리
+│   ├── utils/            # 유틸리티
+│   │   └── session.py    # Redis 세션 관리
+│   └── main.py           # FastAPI 진입점
 ```
 
----
+## 🎬 사용 예시
 
-## 💬 사용 예시
+### **멀티턴 요금제 추천**
 
 ```plaintext
-🧍 유저: 데이터는 적게 쓰고 통화는 많이 해요
-→ 요금제 멀티턴 흐름 시작 → 최적 요금제 추천
+👤 사용자: "요금제 추천해줘" (tone: muneoz)
+🤖 무너: "안뇽! 🤟 데이터 얼마나 쓰는 편이야?"
 
-🧍 유저: 커피 좋아하는데 이와 관련된 구독 있어?
-→ 구독 싱글턴 → 메인+라이프 구독 조합 추천
+👤 사용자: "무제한으로 쓰고 싶어"  
+🤖 무너: "통화는 얼마나 해? 📞"
 
-🧍 유저: 리디랑 올리브영 쿠폰 좋아요 눌렀어요
-→ 좋아요 기반 → 관련 브랜드 연계 구독 조합 추천
+👤 사용자: "거의 안해"
+🤖 무너: "주로 뭐 하면서 시간 보내? 💜"
 
-🧍 유저: 혼자 집에서 영상 보는 걸 좋아해요
-→ UBTI 분석 → TK-Eggy (집콕 마요타코) + 요금제 추천
+👤 사용자: "유튜브랑 게임"
+🤖 무너: "한 달에 얼마 정도 쓸 생각이야? 💰"
+
+👤 사용자: "4만원 정도"
+🤖 무너: "완전 찰떡인 요금제 찾았어! 🔥
+        ✅ 5G 다이렉트 39 / 39,000원 / 무제한 / 기본통화
+        → 데이터 무제한에 게임/영상 최적화! 💜"
 ```
+
+### **구독 서비스 추천**
+
+```plaintext
+👤 사용자: "커피 좋아하는데 관련 구독 있어?" (tone: general)
+🤖 상담원: "커피를 좋아하시는군요! 😊
+
+          ✅ 추천 메인 구독
+          • 지니뮤직 - 9,900원
+          → 카페에서 음악과 함께 완벽한 조합
+
+          ✅ 추천 라이프 구독  
+          • 스타벅스 쿠폰
+          → 매월 할인된 가격으로 커피 즐기세요!"
+```
+
+### **좋아요 기반 추천**
+
+```plaintext
+👤 사용자: "메가커피랑 CGV 좋아요 눌렀어요" (tone: muneoz)
+🤖 무너: "야! 카페랑 영화 완전 좋아하는구나! 🎬☕
+
+        ✅ 추천 메인 구독
+        • U+모바일tv - 7,700원  
+        → 이동 중에도 드라마/영화 무제한! 
+
+        ✅ 추천 라이프 브랜드
+        • 메가커피 쿠폰
+        → 영화 보기 전 커피 한잔, 완전 찰떡! 💜"
+```
+
+### **UBTI 성향 분석**
+
+```plaintext
+👤 사용자: "혼자 집에서 넷플릭스 보는 걸 좋아해요"
+🤖 시스템: UBTI 분석 중...
+
+📱 결과: 
+{
+  "ubti_type": {
+    "code": "TK-Eggy",
+    "name": "집콕 마요타코",
+    "emoji": "🥚"
+  },
+  "recommendation": {
+    "plans": [
+      {"name": "5G 슬림", "description": "집에서 영상 시청 최적화"},
+      {"name": "LTE 34", "description": "가성비 스트리밍 요금제"}
+    ],
+    "subscription": {
+      "name": "넷플릭스",  
+      "description": "집콕 생활의 완벽한 파트너"
+    }
+  }
+}
+```
+
+## 핵심 기술 특징
+
+> **Vector DB 검색 기반 RAG가 아닌**, **정적 템플릿 기반의 효율적인 대화 AI**로 설계되어 빠르고 안정적인 사용자 경험을 제공합니다! 
+
+### **Template-based Architecture**
+- **정적 프롬프트**: RAG 없이 미리 정의된 템플릿 사용
+- **빠른 응답**: 벡터 검색 없이 즉시 응답 생성  
+- **일관된 품질**: 검증된 프롬프트로 안정적 결과
+
+### **멀티턴 대화 플로우**
+- **4단계 강제 진행**: 정확한 정보 수집하여 안정적 답변 보장
+- **중간 이탈 방지**: 다른 메시지에도 플로우 유지
+- **Redis 세션**: 안정적인 상태 관리
+
+### **스트리밍 최적화**  
+- **차별화된 속도**: 질문(0.05초) vs AI응답(0.01초)
+- **자연스러운 UX**: 실제 타이핑하는 느낌
+- **실시간 처리**: FastAPI 비동기 스트리밍
+
+### **톤별 캐릭터**
+- **상반된 성격**: 전문 상담원 ↔ 친근한 무너
+- **MZ 감성 추구**: 트렌디한 언어와 이모지 활용
+
