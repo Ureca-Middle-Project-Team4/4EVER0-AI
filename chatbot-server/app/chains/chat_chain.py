@@ -7,25 +7,45 @@ from app.utils.langchain_client import get_chat_model
 from langchain_core.output_parsers import StrOutputParser
 from app.schemas.chat import ChatRequest
 
-# 요금제 질문 플로우
-PHONE_PLAN_FLOW = [
-    ("data_usage", "데이터는 얼마나 사용하시나요?\\n\\n(예: 5GB, 무제한, 많이 사용해요)"),
-    ("call_usage", "통화는 얼마나 사용하시나요?\\n\\n(예: 거의 안해요, 1시간 정도, 많이 해요)"),
-    ("services", "자주 사용하는 서비스가 있나요?\\n\\n(예: 유튜브, 게임, SNS, 업무용)"),
-    ("budget", "예산은 어느 정도로 생각하고 계신가요?\\n\\n(예: 3만원대, 5만원 이하)")
-]
+# 요금제 질문 플로우 - 말투별로 분리
+PHONE_PLAN_FLOW = {
+    "general": [
+        ("data_usage", "데이터는 얼마나 사용하시나요?\\n\\n(예: 5GB, 무제한, 많이 사용해요)"),
+        ("call_usage", "통화는 얼마나 사용하시나요?\\n\\n(예: 거의 안해요, 1시간 정도, 많이 해요)"),
+        ("services", "자주 사용하는 서비스가 있나요?\\n\\n(예: 유튜브, 게임, SNS, 업무용)"),
+        ("budget", "예산은 어느 정도로 생각하고 계신가요?\\n\\n(예: 3만원대, 5만원 이하)")
+    ],
+    "muneoz": [
+        ("data_usage", "데이터 얼마나 써? 🤟\\n\\n(예: 5GB, 무제한, 많이 써요)"),
+        ("call_usage", "통화는 얼마나 해? 📞\\n\\n(예: 거의 안해, 1시간 정도, 많이 해)"),
+        ("services", "자주 쓰는 서비스 있어? 📱\\n\\n(예: 유튜브, 게임, SNS, 업무용)"),
+        ("budget", "예산은 얼마 정도 생각하고 있어? 💰\\n\\n(예: 3만원대, 5만원 이하)")
+    ]
+}
 
-# 구독 서비스 질문 플로우
-SUBSCRIPTION_FLOW = [
-    ("content_type", "어떤 콘텐츠를 주로 즐기시나요?\\n\\n(예: 드라마, 영화, 음악, 스포츠)"),
-    ("device_usage", "주로 어떤 기기로 보시나요?\\n\\n(예: 스마트폰, TV, 태블릿)"),
-    ("time_usage", "언제 주로 시청하시나요?\\n\\n(예: 출퇴근시간, 저녁시간, 주말)"),
-    ("preference", "선호하는 장르나 특별히 관심있는 브랜드가 있나요?\\n\\n(예: 액션, 로맨스, 특정 채널)")
-]
+# 구독 서비스 질문 플로우 - 말투별로 분리
+SUBSCRIPTION_FLOW = {
+    "general": [
+        ("content_type", "어떤 콘텐츠를 주로 즐기시나요?\\n\\n(예: 드라마, 영화, 음악, 스포츠)"),
+        ("device_usage", "주로 어떤 기기로 보시나요?\\n\\n(예: 스마트폰, TV, 태블릿)"),
+        ("time_usage", "언제 주로 시청하시나요?\\n\\n(예: 출퇴근시간, 저녁시간, 주말)"),
+        ("preference", "선호하는 장르나 특별히 관심있는 브랜드가 있나요?\\n\\n(예: 액션, 로맨스, 특정 채널)")
+    ],
+    "muneoz": [
+        ("content_type", "뭘 주로 봐? 🎬\\n\\n(예: 드라마, 영화, 음악, 스포츠)"),
+        ("device_usage", "주로 뭘로 봐? 📱\\n\\n(예: 스마트폰, TV, 태블릿)"),
+        ("time_usage", "언제 주로 봐? ⏰\\n\\n(예: 출퇴근시간, 저녁시간, 주말)"),
+        ("preference", "좋아하는 장르나 특별히 관심있는 브랜드 있어? 💜\\n\\n(예: 액션, 로맨스, 특정 채널)")
+    ]
+}
 
 def detect_intent(message: str) -> str:
     """간단한 인텐트 감지"""
     lowered = message.lower()
+
+    # 인사 감지
+    if any(word in lowered for word in ["안녕", "반갑", "hi", "hello"]):
+        return "greeting"
 
     if "구독" in lowered:
         return "subscription_recommend"
@@ -45,7 +65,9 @@ async def natural_streaming(text: str):
         await asyncio.sleep(0.05)
 
 
-def get_chain_by_intent(intent: str, req: ChatRequest) -> Callable[[], Awaitable[str]]:
+def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
+    print(f"[DEBUG] get_chain_by_intent - intent: {intent}, tone: {tone}")
+
     session = get_session(req.session_id)
     message = req.message
     session.setdefault("history", [])
@@ -53,7 +75,7 @@ def get_chain_by_intent(intent: str, req: ChatRequest) -> Callable[[], Awaitable
 
     # 멀티턴 처리
     if intent in ["phone_plan_multi", "subscription_multi"]:
-        return get_multi_turn_chain(req, intent)
+        return get_multi_turn_chain(req, intent, tone)  # tone 추가
 
     save_session(req.session_id, session)
 
@@ -89,7 +111,8 @@ def get_chain_by_intent(intent: str, req: ChatRequest) -> Callable[[], Awaitable
             f"- {b.name}" for b in life_items
         ])
 
-    prompt = get_prompt_template(intent)
+    # tone을 고려한 프롬프트 선택 (중복 제거)
+    prompt = get_prompt_template(intent, tone)  # tone 파라미터 추가
     model = get_chat_model()
     chain = prompt | model | StrOutputParser()
 
@@ -105,19 +128,21 @@ def get_chain_by_intent(intent: str, req: ChatRequest) -> Callable[[], Awaitable
     return stream
 
 
-async def get_multi_turn_chain(req: ChatRequest, intent: str) -> Callable[[], Awaitable[str]]:
+async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "general") -> Callable[[], Awaitable[str]]:
+    print(f"[DEBUG] get_multi_turn_chain - intent: {intent}, tone: {tone}")
+
     session = get_session(req.session_id)
     message = req.message
 
-    # 인텐트별 질문 플로우 선택
+    # 인텐트별 질문 플로우 선택 (말투 고려)
     if intent == "phone_plan_multi":
-        question_flow = PHONE_PLAN_FLOW
+        question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
         flow_key = "phone_plan_flow"
     elif intent == "subscription_multi":
-        question_flow = SUBSCRIPTION_FLOW
+        question_flow = SUBSCRIPTION_FLOW.get(tone, SUBSCRIPTION_FLOW["general"])
         flow_key = "subscription_flow"
     else:
-        question_flow = PHONE_PLAN_FLOW
+        question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
         flow_key = "phone_plan_flow"
 
     # 현재 단계 확인
@@ -136,7 +161,7 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str) -> Callable[[], Aw
         session["history"].append({"role": "assistant", "content": question})
         save_session(req.session_id, session)
 
-        print(f"[DEBUG] Starting multiturn flow, asking first question")
+        print(f"[DEBUG] Starting multiturn flow, asking first question: {question[:50]}...")
 
         async def stream():
             async for chunk in natural_streaming(question):
@@ -173,19 +198,21 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str) -> Callable[[], Aw
             print(f"[DEBUG] All questions completed. Generating final recommendation...")
 
             if intent == "phone_plan_multi":
-                return await get_final_plan_recommendation(req, user_info)
+                return await get_final_plan_recommendation(req, user_info, tone)
             elif intent == "subscription_multi":
-                return await get_final_subscription_recommendation(req, user_info)
+                return await get_final_subscription_recommendation(req, user_info, tone)
 
     # 여기까지 오면 안되지만 안전장치
     print(f"[DEBUG] Unexpected flow state - falling back to final recommendation")
     if intent == "phone_plan_multi":
-        return await get_final_plan_recommendation(req, user_info)
+        return await get_final_plan_recommendation(req, user_info, tone)
     elif intent == "subscription_multi":
-        return await get_final_subscription_recommendation(req, user_info)
+        return await get_final_subscription_recommendation(req, user_info, tone)
 
 
-async def get_final_plan_recommendation(req: ChatRequest, user_info: dict) -> Callable[[], Awaitable[str]]:
+async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone: str = "general"):
+    print(f"[DEBUG] get_final_plan_recommendation - tone: {tone}")
+
     session = get_session(req.session_id)
     plans = get_all_plans()
 
@@ -208,7 +235,7 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict) -> Ca
         "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
     }
 
-    prompt = get_prompt_template("phone_plan_multi")
+    prompt = get_prompt_template("phone_plan_multi", tone)  # tone 추가
     model = get_chat_model()
     chain = prompt | model | StrOutputParser()
 
@@ -232,7 +259,9 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict) -> Ca
     return stream
 
 
-async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict) -> Callable[[], Awaitable[str]]:
+async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
+    print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
+
     session = get_session(req.session_id)
 
     from app.db.subscription_db import get_products_from_db
@@ -261,7 +290,7 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
         "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
     }
 
-    prompt = get_prompt_template("subscription_recommend")
+    prompt = get_prompt_template("subscription_recommend", tone)  # tone 추가
     model = get_chat_model()
     chain = prompt | model | StrOutputParser()
 
@@ -288,4 +317,4 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
 # 기존 호환성을 위한 레거시 함수
 async def get_multi_turn_chain_legacy(req: ChatRequest) -> Callable[[], Awaitable[str]]:
     """기존 요금제 멀티턴 함수 (호환성 유지)"""
-    return await get_multi_turn_chain(req, "phone_plan_multi")
+    return await get_multi_turn_chain(req, "phone_plan_multi", "general")
