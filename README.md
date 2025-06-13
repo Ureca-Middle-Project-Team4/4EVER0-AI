@@ -10,7 +10,7 @@ OpenAI + LangChain + FastAPI + Redis로 **4단계 멀티턴 대화** 처리 및 
 |------|------|
 | **Language** | Python 3.9 |
 | **Framework** | FastAPI |
-| **AI Engine** | OpenAI GPT (gpt-4o) |
+| **AI Engine** | OpenAI GPT (gpt-4o-mini) |
 | **AI Pipeline** | **LangChain Template-based Chain** |
 | **Session Management** | Redis (TTL 1800초) |
 | **ORM / DB** | SQLAlchemy (ORM), MySQL |
@@ -38,7 +38,7 @@ graph TD
     G --> H
     
     H --> I[LangChain ChatPromptTemplate]
-    I --> J[GPT-4o 응답 생성]
+    I --> J[GPT-4o-mini 응답 생성]
     J --> K[스트리밍 응답]
     
     subgraph "Redis 세션 관리"
@@ -71,7 +71,7 @@ sequenceDiagram
     participant API as FastAPI
     participant Redis as Redis
     participant Chain as LangChain
-    participant GPT as GPT-4o
+    participant GPT as GPT-4o-mini
 
     User->>API: "요금제 추천해줘" (tone: general/muneoz)
     API->>Redis: 세션 상태 확인
