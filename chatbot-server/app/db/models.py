@@ -52,4 +52,4 @@ class CouponLike(Base):
     user_id = Column(Integer, nullable=False)
     brand_id = Column(Integer, nullable=False)
     is_liked = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(KST))
+#     created_at = Column(DateTime, default=lambda: datetime.now(KST))

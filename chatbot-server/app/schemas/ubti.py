@@ -6,7 +6,7 @@ class PlanOrSubscription(BaseModel):
     description: str
 
 class Recommendation(BaseModel):
-    plan: PlanOrSubscription
+    plans: List[PlanOrSubscription]  # 단일 plan -> plans 리스트로 변경
     subscription: PlanOrSubscription
 
 class MatchingType(BaseModel):
@@ -38,4 +38,3 @@ class UBTIResult(BaseModel):
 class UBTIComplete(BaseModel):
     completed: bool = True
     message: str = "모든 질문이 완료되었습니다."
-

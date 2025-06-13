@@ -13,11 +13,11 @@ async def handle_chat_likes(req: LikesChatRequest):
     subscriptions = get_products_from_db()
     brands = get_life_brands_from_db()
 
-    # 3. 포맷팅
-    main = "\n".join([
+    # 3. 포맷팅 - 명시적 줄바꿈 적용
+    main = "\\n\\n".join([
         f"- {s.title} / {s.price}원 / {s.category}" for s in subscriptions
     ])
-    life = "\n".join([
+    life = "\\n\\n".join([
         f"- {b.name} / {b.description}" for b in brands if b.id in liked_brand_ids
     ])
 
