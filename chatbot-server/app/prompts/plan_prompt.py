@@ -105,7 +105,3 @@ PLAN_PROMPTS = {
 """
     }
 }
-
-# subscription_prompt.py
-SUBSCRIPTION_PROMPT = {
-    "genera
