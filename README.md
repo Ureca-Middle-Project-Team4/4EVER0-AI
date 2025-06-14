@@ -319,6 +319,7 @@ PLAN_PROMPTS = {
 # 2. LangChain 템플릿 생성 및 체인 실행
 chain = get_prompt_template(intent, tone) | llm
 response = await chain.astream(context)
+```
 
 ## 🔧 Redis 세션 관리
 
@@ -332,7 +333,6 @@ response = await chain.astream(context)
     {"role": "assistant", "content": "데이터 얼마나 쓰는 편이야? 🤟"}
   ]
 }
-```
 ```
 
 ### **세션 라이프사이클**
@@ -363,4 +363,3 @@ stateDiagram-v2
         4단계 플로우 진행
     end note
 ```
-
