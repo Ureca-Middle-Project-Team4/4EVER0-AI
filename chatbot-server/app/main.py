@@ -1,4 +1,3 @@
-# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -6,22 +5,23 @@ from contextlib import asynccontextmanager
 from app.api.chat import router as chat_router
 from app.api.ubti import router as ubti_router
 from app.api.chat_like import router as chat_like_router
-from app.api.usage import router as usage_router  # 🆕 새로 추가
+from app.api.usage import router as usage_router
+from app.api.recommendation import router as recommendation_router
 from app.db.database import SessionLocal, engine, Base
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 테이블 생성
     Base.metadata.create_all(bind=engine)
-    print("✅ 데이터베이스 테이블 생성 완료")
-    
+    print("데이터베이스 테이블 생성 완료")
+
     yield
-    
-    print("🔄 애플리케이션 종료 중...")
+
+    print("애플리케이션 종료 중...")
 
 # FastAPI 인스턴스
 app = FastAPI(
-    title="LG U+ AI 챗봇 API v2.0",
+    title="MoonoZ AI 챗봇 API v2.0",
     description="Enhanced Template-based LangChain System AI with Smart Intent Detection",
     version="2.0.0",
     lifespan=lifespan,
@@ -34,9 +34,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",   # Vite 개발 서버
-        "http://localhost:3000",   # React 개발 서버
         "http://127.0.0.1:5173",   # 로컬 IP
-        "http://127.0.0.1:3000"    # 로컬 IP
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -47,31 +45,38 @@ app.add_middleware(
 app.include_router(chat_router, prefix="/api", tags=["💬 Chat"])
 app.include_router(ubti_router, prefix="/api", tags=["🎯 UBTI"])
 app.include_router(chat_like_router, prefix="/api", tags=["💜 Likes"])
-app.include_router(usage_router, prefix="/api", tags=["📊 Usage"])  # 🆕 새로 추가
+app.include_router(usage_router, prefix="/api", tags=["📊 Usage"])
+app.include_router(recommendation_router, prefix="/api", tags=["🎁 Recommendations"])
 
 # 루트 엔드포인트
 @app.get("/", tags=["🏠 Info"])
 async def root():
     """API 정보 및 기능 소개"""
     return {
-        "message": "🚀 LG U+ AI 챗봇 API v2.0",
+        "message": "🚀MoonoZ LG U+ AI 챗봇 API v2.0",
         "description": "Enhanced Template-based LangChain System AI",
         "version": "2.0.0",
         "features": [
             "🧠 AI-powered Intent Detection",
-            "🛡️ Natural Conversation Guard Rails", 
+            "🛡️ Natural Conversation Guard Rails",
             "📊 Usage-based Smart Recommendations",
             "🎯 4-step Multi-turn Conversations",
             "💜 Personalized Tone Support (General/Muneoz)",
-            "🔧 Cross-platform Compatibility"
+            "🔧 Cross-platform Compatibility",
+            "🎁 JSON-based Recommendation Cards"
         ],
         "endpoints": {
             "chat": "/api/chat",
             "usage_recommend": "/api/usage/recommend",
             "usage_check": "/api/usage/{user_id}",
             "ubti_question": "/api/ubti/question",
-            "ubti_result": "/api/ubti/result", 
-            "likes_recommend": "/api/chat/likes"
+            "ubti_result": "/api/ubti/result",
+            "likes_recommend": "/api/chat/likes",
+            "plan_recommendations": "/api/recommendations/plans",
+            "subscription_recommendations": "/api/recommendations/subscriptions",
+            "all_plans": "/api/plans/all",
+            "all_subscriptions": "/api/subscriptions/all",
+            "compare": "/api/compare"
         },
         "docs": "/docs",
         "redoc": "/redoc"
@@ -83,14 +88,15 @@ async def health_check():
     """서버 상태 확인"""
     return {
         "status": "healthy",
-        "message": "🎉 LG U+ AI 챗봇 서버가 정상 작동 중입니다!",
+        "message": "무너즈 AI 챗봇 서버가 정상 작동 중입니다!",
         "version": "2.0.0",
         "services": {
-            "chat": "✅ 활성",
-            "intent_detection": "✅ 활성", 
-            "usage_analysis": "✅ 활성",
-            "ubti": "✅ 활성",
-            "conversation_guard": "✅ 활성"
+            "chat": "활성",
+            "intent_detection": "활성",
+            "usage_analysis": "활성",
+            "ubti": "활성",
+            "conversation_guard": "활성",
+            "recommendation_cards": "활성"
         }
     }
 
@@ -106,7 +112,7 @@ async def api_status():
                 "description": "AI 기반 인텐트 감지 + 자연스러운 대화"
             },
             "usage_recommendation": {
-                "status": "active", 
+                "status": "active",
                 "description": "현재 사용량 기반 스마트 추천"
             },
             "ubti_analysis": {
@@ -116,12 +122,16 @@ async def api_status():
             "likes_curation": {
                 "status": "active",
                 "description": "좋아요 브랜드 기반 구독 큐레이션"
+            },
+            "recommendation_cards": {
+                "status": "active",
+                "description": "JSON 기반 추천 카드 시스템 (프론트엔드 렌더링용)"
             }
         },
         "ai_models": {
             "intent_classifier": "GPT-4o-mini",
             "conversation_engine": "GPT-4o-mini",
-            "recommendation_engine": "Template-based LangChain"
+            "recommendation_engine": "Template-based LangChain + AI Analysis"  # ✅ 업데이트
         }
     }
 
