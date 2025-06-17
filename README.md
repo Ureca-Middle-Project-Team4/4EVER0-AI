@@ -1,25 +1,102 @@
-# 📡 Template-based LangChain System AI
+# 📡 Enhanced Template-based LangChain System AI v2.0
 
 **LG U+ 요금제/구독 서비스 추천 AI 대화 시스템**
 
-OpenAI + LangChain + FastAPI + Redis 기반으로 구축된 Template-based 대화 AI입니다.
-4단계 멀티턴 플로우를 통해 사용자 성향을 파악하고, 개인 맞춤형 서비스를 추천합니다.
+OpenAI GPT-4o-mini + LangChain + FastAPI + Redis 기반으로 구축된 **AI 기반 인텐트 감지**와 **자연스러운 대화 가드레일**을 탑재한 Template-based 대화 AI입니다.
+
+4단계 멀티턴 플로우를 통해 사용자 성향을 파악하고, 개인 맞춤형 서비스를 자연스럽게 추천합니다.
 
 [MoonuZ](https://github.com/Ureca-Middle-Project-Team4) 프로젝트의 AI 대화 엔진으로 개발되었습니다.
 
+
 ## 주요 기능
 
-> **Template-based Conversational AI**로 RAG 대비 빠른 응답속도와 일관된 품질을 제공합니다.
+### **AI 기반 스마트 인텐트 감지**
+기존의 단순 키워드 매칭을 넘어서 **GPT-4o-mini**를 활용한 정확한 의도 파악
 
-### **템플릿 기반 아키텍처**
+| 입력 예시 | v1.0 (기존) | v2.0 (Enhanced) |
+|-----------|-------------|-----------------|
+| "리액트 추천해줘" | 요금제 멀티턴 시작 😑 | 오프토픽 자연스러운 안내 😊 |
+| "파이썬 코딩 알려줘" | 요금제 질문 1단계 😑 | 전문 분야 안내 + 대안 제시 😊 |
+| "3만원대 무제한" | 멀티턴 4단계 😑 | 바로 추천 😊 |
+
+### 🛡️ **자연스러운 대화 가드레일**
+전문 분야를 벗어난 질문에도 부드럽고 친근하게 응답
+```python
+# 무너 톤 오프토픽 응답 예시
+"앗! 그것도 궁금하긴 한데 🤔
+나는 요금제랑 구독 전문가라서 그쪽은 잘 몰라!
+대신 요금제나 구독 서비스 추천은 맡겨줘~ 🐙💜"
+```
+
+### 📊 **사용량 기반 스마트 추천**
+현재 요금제 사용 패턴을 AI가 분석하여 **4가지 추천 타입** 제공
+- **🔥 upgrade**: 사용량 90%+ → 상위 요금제 권장
+- **✅ maintain**: 사용량 70-90% → 현재 유지 권장
+- **💰 downgrade**: 사용량 30%↓ → 절약형 추천
+- **🎯 alternative**: 사용 패턴 맞춤 대안 제시
+
+### 🌍 **완벽한 크로스 플랫폼 지원**
+Windows, macOS, Linux 모든 운영체제에서 **원클릭 설치**
+
+
+## 🚀 초간단 실행 방법
+
+### **🖥️ Windows 사용자**
+```cmd
+git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
+cd 4EVER0-AI
+setup.bat
+run.bat
+```
+
+### **🍎 macOS/Linux 사용자**
+```bash
+git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
+cd 4EVER0-AI
+chmod +x setup.sh run.sh
+./setup.sh
+./run.sh
+```
+
+### **⚙️ 개발자 수동 설치**
+```bash
+# 1. 프로젝트 클론
+git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
+cd 4EVER0-AI/chatbot-server
+
+# 2. 가상환경 생성 및 활성화
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. 패키지 설치
+pip install -r requirements.txt
+# 윈도우: pip install -r requirements-windows.txt
+
+# 4. .env 설정
+
+# 5. Redis 시작
+redis-server
+
+# 6. 서버 실행
+python run.py
+```
+
+## 주요 기능
+
+> **Template-based Conversational AI**로 RAG 대비 빠른 응답속도와 일관된 품질을 제공하면서도 **자연스러운 대화**를 구현합니다.
+
+### **템플릿 기반 아키텍처 + AI 인텐트**
 - **Instant Response**: RAG 벡터 검색 과정 없이 바로 응답 생성
+- **Smart Intent Detection**: GPT-4o-mini 기반 정확한 의도 파악
 - **Consistent Quality**: 사전 검증된 프롬프트로 일관된 결과 보장
-- **Lightweight Structure**: 복잡한 임베딩 및 검색 과정 제거
+- **Natural Conversation**: 오프토픽 질문에도 자연스러운 응답
 
 ### **멀티턴 대화 관리**
 - **Structured Flow**: 4단계 필수 진행으로 정확한 정보 수집
 - **Session Persistence**: 대화 중단 시에도 컨텍스트 유지
 - **Redis-based Storage**: TTL 30분으로 효율적 메모리 관리
+- **Smart Flow Control**: AI가 멀티턴 vs 직접 추천 자동 판단
 
 ### **스트리밍 응답 최적화**
 - **Differentiated Latency**: 질문 0.05초, AI 응답 0.01초
@@ -29,27 +106,8 @@ OpenAI + LangChain + FastAPI + Redis 기반으로 구축된 Template-based 대�
 ### **페르소나 기반 응답**
 - **Dual Character System**: 전문 상담원과 친근한 어시스턴트 중 선택 가능
 - **User-tailored Tone**: 사용자 선호에 따른 톤 변경
+- **Context Aware**: 상황에 맞는 자연스러운 응답
 
-## 실행 방법
-
-```bash
-# 1. 프로젝트 클론
-git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
-cd chatbot-server
-
-# 2. 가상환경 생성 및 활성화
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 3. 패키지 설치
-pip install -r requirements.txt
-
-# 4. .env 설정
-echo "OPENAI_API_KEY=sk-xxxxxxxxxxxx" > .env
-
-# 5. 서버 실행
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
 
 ## Tech Stack
 
@@ -66,11 +124,34 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 
 **📄 API 문서:**
-
-> 배포 예정입니다.
-
 - [Swagger Docs](http://localhost:8000/docs)
 - [ReDoc Docs](http://localhost:8000/redoc)
+
+
+##  API 간단 가이드
+
+### **메인 채팅 & 서비스 추천**
+```bash
+POST /api/chat                 # AI 인텐트 기반 스마트 채팅
+POST /api/chat/likes          # 좋아요 브랜드 기반 추천
+POST /api/usage/recommend     # 사용중인 요금제 기반 맞춤 추천
+GET  /api/usage/{user_id}    # 현재 사용량 조회
+```
+
+### **UBTI 성향 분석 (타코시그널) **
+```bash
+POST /api/ubti/question       # UBTI 4단계 질문 진행
+POST /api/ubti/result        # 최종 성향 분석 결과 출력용
+```
+
+### **시스템 정보**
+```bash
+GET  /                       # API 소개 및 기능 목록
+GET  /health                 # 서버 상태 확인
+GET  /api/status            # 서비스별 상태 체크 
+GET  /debug/session/{id}    # 세션 디버깅 (개발용)
+```
+
 
 ## 📁 폴더 구조
 
@@ -79,231 +160,112 @@ chatbot-server/
 ├── app/
 │   ├── api/              # FastAPI 라우터
 │   │   ├── chat.py       # 채팅/추천 API
-│   │   └── ubti.py       # UBTI 성향 분석 API
+│   │   ├── ubti.py       # UBTI 성향 분석 API
+│   │   ├── chat_like.py  # 좋아요 기반 추천 API
+│   │   └── usage.py      # 사용량 기반 추천 API
 │   ├── chains/           # LangChain 체인 구성
 │   │   ├── chat_chain.py # 멀티턴 체인 로직
-│   │   └── ubti_chain.py # UBTI 분석 체인
-│   ├── db/               # Mock 데이터베이스
-│   │   ├── plans.py      # 요금제 정보
-│   │   └── subscriptions.py # 구독 서비스 정보
+│   │   ├── ubti_chain.py # UBTI 분석 체인
+│   │   └── usage_chain.py # 사용량 분석 체인
+│   ├── db/               # 데이터베이스
+│   │   ├── models.py     # User 모델 추가
+│   │   ├── plan_db.py    # 요금제 정보
+│   │   ├── subscription_db.py # 구독 서비스 정보
+│   │   ├── brand_db.py   # 브랜드 정보
+│   │   ├── ubti_types_db.py # UBTI 타입 정보
+│   │   └── user_usage_db.py # 사용량 DB 접근
 │   ├── prompts/          # 정적 프롬프트 템플릿
-│   │   ├── base_prompt.py     # 기본 톤별 템플릿
+│   │   ├── base_prompt.py     # 확장된 기본 템플릿
 │   │   ├── plan_prompt.py     # 요금제 추천 템플릿
 │   │   ├── subscription_prompt.py # 구독 추천 템플릿
-│   │   └── ubti_prompt.py     # UBTI 분석 템플릿
+│   │   ├── like_prompt.py     # 좋아요 기반 템플릿
+│   │   ├── ubti_prompt.py     # UBTI 분석 템플릿
+│   │   └── usage_prompt.py    # 사용량 기반 프롬프트
 │   ├── schemas/          # Request/Response 모델
+│   │   ├── chat.py       # 채팅 관련 스키마
+│   │   ├── ubti.py       # UBTI 관련 스키마
+│   │   └── usage.py      # 사용량 관련 스키마
 │   ├── services/         # 비즈니스 로직
-│   │   ├── intent.py     # 인텐트 감지
-│   │   └── handle_chat.py # 채팅 플로우 관리
+│   │   ├── handle_chat.py # 강화된 채팅 핸들러
+│   │   ├── handle_chat_likes.py # 좋아요 기반 핸들러
+│   │   └── handle_ubti.py # UBTI 핸들러
 │   ├── utils/            # 유틸리티
-│   │   └── session.py    # Redis 세션 관리
-│   └── main.py           # FastAPI 진입점
+│   │   ├── intent_classifier.py # AI 인텐트 분류기
+│   │   ├── conversation_guard.py # 대화 가드레일
+│   │   ├── intent.py     # 인텐트 통합 관리
+│   │   ├── langchain_client.py # LangChain 클라이언트
+│   │   └── redis_client.py  # Redis 세션 관리
+│   └── main.py           # 업데이트된 FastAPI 진입점
+├── requirements.txt       # 기존 의존성
+├── requirements-windows.txt # Windows 최적화
+├── setup.sh              # Linux/macOS 설치
+├── setup.bat             # Windows 설치
+├── run.sh                # Linux/macOS 실행
+└── run.bat               # Windows 실행
 ```
+
 
 
 ## 시스템 아키텍처
 
-### **Template-based Conversational AI 구조**
+### **Enhanced AI-Powered Conversational Architecture**
 
 ```mermaid
 graph TD
-    A[사용자 메시지] --> B[인텐트 감지]
+    A[사용자 메시지] --> B[🧠 GPT-4o-mini<br/>Intent Classifier]
     B --> C{인텐트 분류}
     
-    C -->|phone_plan_multi| D[요금제 4단계 멀티턴]
-    C -->|subscription_recommend| E[구독 단일 추천]
-    C -->|subscription_likes| F[좋아요 기반 추천]
-    C -->|ubti_recommend| G[UBTI 성향 분석]
+    C -->|telecom_plan| D[요금제 멀티턴 추천]
+    C -->|telecom_plan_direct| E[요금제 직접 추천]
+    C -->|subscription| F[구독 서비스 추천]
+    C -->|current_usage| G[사용량 API 안내]
+    C -->|off_topic| H[🛡️ Conversation Guard]
+    C -->|ubti| I[UBTI API 안내]
+    C -->|greeting| J[인사 응답]
     
-    D --> H[정적 프롬프트 템플릿 선택]
-    E --> H
-    F --> H
-    G --> H
+    D --> K[정적 프롬프트 템플릿 선택]
+    E --> K
+    F --> K
+    G --> L[자연스러운 안내 응답]
+    H --> L
+    I --> L
+    J --> L
     
-    H --> I[LangChain ChatPromptTemplate]
-    I --> J[GPT-4o-mini 응답 생성]
-    J --> K[스트리밍 응답]
+    K --> M[LangChain ChatPromptTemplate]
+    M --> N[GPT-4o-mini 응답 생성]
+    N --> O[스트리밍 응답]
+    L --> O
+    
+    subgraph "사용량 기반 추천"
+        P[사용량 분석 체인]
+        Q[스마트 추천 로직]
+    end
     
     subgraph "Redis 세션 관리"
-        L[멀티턴 상태]
-        M[사용자 정보]
-        N[대화 히스토리]
+        R[멀티턴 상태]
+        S[사용자 정보]
+        T[대화 히스토리]
     end
     
-    D -.-> L
-    D -.-> M
-    K -.-> N
+    D -.-> R
+    D -.-> S
+    O -.-> T
 ```
 
-## 🔍 주요 기능 소개 및 API 플로우
-
-### 1. 📱 **요금제 멀티턴 추천** (`POST /api/chat`)
-
-**Intent:** `phone_plan_multi`
-
-```mermaid
-sequenceDiagram
-    participant User as 사용자
-    participant API as FastAPI
-    participant Redis as Redis
-    participant Chain as LangChain
-    participant GPT as GPT-4o-mini
-
-    User->>API: "요금제 추천해줘" (tone: general/muneoz)
-    API->>Redis: 세션 상태 확인
-    Redis-->>API: step: 0 (새 시작)
-    
-    Note over API: 4단계 강제 플로우 시작
-    
-    API->>Chain: 1단계 질문 템플릿 로드
-    Chain-->>API: "데이터는 얼마나 사용하시나요?"
-    API->>User: 스트리밍 응답 (0.05초/단어)
-    
-    User->>API: "무제한으로 쓰고 싶어요"
-    API->>Redis: step: 1, data_usage 저장
-    API->>Chain: 2단계 질문 템플릿
-    Chain-->>API: "통화는 얼마나 사용하시나요?"
-    API->>User: 스트리밍 응답
-    
-    Note over API,Redis: 3단계, 4단계 반복...
-    
-    User->>API: "3만원 정도" (4단계 완료)
-    API->>Redis: 모든 정보 수집 완료
-    Redis-->>API: user_info: {data, call, service, budget}
-    
-    API->>Chain: 최종 추천 프롬프트 템플릿
-    Chain->>GPT: 프롬프트 + 사용자 정보
-    GPT-->>Chain: 맞춤 요금제 추천
-    Chain-->>API: 최종 응답
-    API->>User: 스트리밍 응답 (0.01초/청크)
-    API->>Redis: 세션 초기화
-```
-
-> **4단계 질문 플로우**
-1. **데이터 사용량**: "5GB, 무제한, 많이 사용해요"
-2. **통화 사용량**: "거의 안해요, 1시간 정도, 많이 해요"  
-3. **서비스 사용**: "유튜브, 게임, SNS, 업무용"
-4. **예산 범위**: "3만원대, 5만원 이하"
-
-### 2. ☕ **구독 단일 추천** (`POST /api/chat`)
-
-**Intent:** `subscription_recommend`
-
-```mermaid
-graph LR
-    A[사용자 메시지] --> B[인텐트: subscription_recommend]
-    B --> C[구독 추천 프롬프트 템플릿]
-    C --> D[메인 구독 + 라이프 조합]
-    D --> E[단일 응답 생성]
-    
-    subgraph "프롬프트 구조"
-        F[사용자 관심사]
-        G[메인 구독 DB]
-        H[라이프 구독 DB]
-    end
-    
-    C --> F
-    C --> G
-    C --> H
-```
-
-**응답 예시:**
-```
-고객님의 관심사를 보니 음악과 커피를 좋아하시는군요! 😊
-
-✅ 추천 메인 구독
-• 지니뮤직 - 9,900원
-→ 무제한 음악 스트리밍으로 취향저격!
-
-✅ 추천 라이프 구독  
-• 스타벅스 쿠폰
-→ 음악 들으며 카페 시간 완벽 조합!
-```
-
-### 3. 💜 **좋아요 기반 추천** (`POST /api/chat/likes`)
-
-```mermaid
-flowchart TD
-    A[좋아요 브랜드 입력] --> B[브랜드 분석]
-    B --> C[라이프스타일 패턴 매칭]
-    C --> D[메인 구독 선별]
-    D --> E[브랜드 연계 추천]
-    E --> F[조합 응답 생성]
-    
-    subgraph "추천 로직"
-        G[스타벅스 → 음악/독서]
-        H[올리브영 → 뷰티/라이프]
-        I[CGV → 영화/엔터]
-    end
-    
-    C --> G
-    C --> H
-    C --> I
-```
-
-### 4. 🍡 **UBTI 성향 분석** (`POST /api/ubti/question`, `POST /api/ubti/result`)
-
-```mermaid
-graph TD
-    A[UBTI 시작] --> B[자유 질문 4개]
-    B --> C[사용자 답변 수집]
-    C --> D[GPT 성향 분석]
-    D --> E[8가지 타입 매칭]
-    E --> F[요금제 2개 + 구독 1개]
-    F --> G[JSON 응답]
-    
-    subgraph "UBTI 타입들"
-        H[TK-Berry: 꾸안꾸 소셜타코]
-        I[TK-Milky: 느긋한 라이트타코]
-        J[TK-Eggy: 집콕 마요타코]
-        K[기타 5가지...]
-    end
-    
-    E --> H
-    E --> I
-    E --> J
-    E --> K
-```
-
-## 페르소나 기반 캐릭터 선택 시스템
-
-**🏢 General (전문 상담원)**
-- 정중한 존댓말과 체계적인 상담
-- "고객님께 맞는 요금제를 추천드리겠습니다"
-
-**🤟 Muneoz (MZ 친구)**
-- MZ세대 감성의 친근한 반말
-- "야! 완전 찰떡인 거 추천해줄게~ 🔥"
-
-> 사용자가 원하는 대화 스타일을 선택하여 개인화된 상담 경험 제공
-
-**톤별 응답 예시:**
-```javascript
-// General 톤
-{
-  "message": "요금제 추천해줘",
-  "tone": "general"
-}
-// 응답: "안녕하세요, 고객님! 😊 데이터는 얼마나 사용하시나요?"
-
-// Muneoz 톤  
-{
-  "message": "요금제 추천해줘",
-  "tone": "muneoz"
-}
-// 응답: "안뇽! 🤟 나는 무너야~ 🐙 데이터 얼마나 쓰는 편이야?"
-```
 
 ## 프롬프트 템플릿 설계 및 구조
 
-### **Template-based Chain 동작 원리**
+### **Enhanced Template-based Chain 동작 원리**
 
-> **인텐트별 프롬프트 템플릿**: 사용자의 발화 의도(`phone_plan_multi`)와 선호 톤(`general`, `muneoz`)에 따라 미리 정의된 프롬프트 템플릿을 선택하여 LLM 체인을 구성합니다.
+> **AI 기반 인텐트 분류 + 템플릿 선택**: 사용자의 발화를 GPT-4o-mini가 정확히 분류한 후, 인텐트(`telecom_plan`)와 선호 톤(`general`, `muneoz`)에 따라 미리 정의된 프롬프트 템플릿을 선택하여 LLM 체인을 구성합니다.
 
 ```python
-# 1. 인텐트별 프롬프트 템플릿 정의
+# 1. AI 기반 인텐트 분류
+intent = await classify_intent(user_message)  # GPT-4o-mini 활용
+
+# 2. 인텐트별 프롬프트 템플릿 정의
 PLAN_PROMPTS = {
-    "phone_plan_multi": {
+    "telecom_plan": {
         "general": """당신은 LG유플러스 요금제 전문가입니다.
         [수집된 사용자 정보] {user_info}
         [요금제 목록] {plans}
@@ -316,10 +278,16 @@ PLAN_PROMPTS = {
     }
 }
 
-# 2. LangChain 템플릿 생성 및 체인 실행
+# 3. 가드레일 처리
+if intent == "off_topic":
+    response = await handle_off_topic(user_message, tone)
+    
+# 4. LangChain 템플릿 생성 및 체인 실행
 chain = get_prompt_template(intent, tone) | llm
 response = await chain.astream(context)
 ```
+
+
 
 ## 🔧 Redis 세션 관리
 
@@ -328,9 +296,16 @@ response = await chain.astream(context)
 ```json
 {
   "session_id": "user_123",
+  "phone_plan_flow_step": 2,
+  "user_info": {
+    "data_usage": "무제한",
+    "call_usage": "적게 사용"
+  },
   "history": [
     {"role": "user", "content": "요금제 추천해줘"},
-    {"role": "assistant", "content": "데이터 얼마나 쓰는 편이야? 🤟"}
+    {"role": "assistant", "content": "데이터 얼마나 쓰는 편이야? 🤟"},
+    {"role": "user", "content": "무제한으로 쓰고 싶어"},
+    {"role": "assistant", "content": "통화는 얼마나 해? 📞"}
   ]
 }
 ```
@@ -339,7 +314,10 @@ response = await chain.astream(context)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> 새_세션_생성
+    [*] --> AI_인텐트_분류
+    AI_인텐트_분류 --> {멀티턴_필요?}
+    {멀티턴_필요?} --> 새_세션_생성: Yes
+    {멀티턴_필요?} --> 직접_응답: No
     새_세션_생성 --> 멀티턴_시작
     멀티턴_시작 --> 1단계_질문
     1단계_질문 --> 2단계_질문
@@ -347,19 +325,40 @@ stateDiagram-v2
     3단계_질문 --> 4단계_질문
     4단계_질문 --> 최종_추천
     최종_추천 --> 세션_초기화
+    직접_응답 --> 세션_초기화
     세션_초기화 --> [*]
     
-    새_세션_생성: 새 세션 생성
-    멀티턴_시작: 멀티턴 시작
-    1단계_질문: 1단계 질문
-    2단계_질문: 2단계 질문
-    3단계_질문: 3단계 질문
-    4단계_질문: 4단계 질문
-    최종_추천: 최종 추천
-    세션_초기화: 세션 초기화
+    note right of AI_인텐트_분류
+        GPT-4o-mini 기반
+        정확한 의도 파악
+    end note
     
     note right of 멀티턴_시작
         Redis TTL: 30분
         4단계 플로우 진행
     end note
+```
+
+
+## 배포 및 운영
+
+### **환경별 설정**
+
+#### **개발 환경**
+```bash
+python run.py
+# 또는
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### **헬스체크 엔드포인트**
+```bash
+# 서버 상태 확인
+curl http://localhost:8000/health
+
+# API 서비스별 상태
+curl http://localhost:8000/api/status
+
+# 세션 디버깅 (개발용)
+curl http://localhost:8000/debug/session/test_session_id
 ```
