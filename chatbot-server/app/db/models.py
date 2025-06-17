@@ -53,3 +53,15 @@ class CouponLike(Base):
     brand_id = Column(Integer, nullable=False)
     is_liked = Column(Boolean, nullable=False, default=False)
 #     created_at = Column(DateTime, default=lambda: datetime.now(KST))
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    current_plan_id = Column(Integer, ForeignKey("plans.id"))
+    remaining_data = Column(Integer, default=0)  # MB 단위
+    remaining_share_data = Column(Integer, default=0)
+    remaining_voice = Column(Integer, default=0)  # 분 단위
+    remaining_sms = Column(Integer, default=0)
+    last_updated = Column(DateTime, default=lambda: datetime.now(KST))
+
