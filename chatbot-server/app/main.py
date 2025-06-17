@@ -6,7 +6,6 @@ from app.api.chat import router as chat_router
 from app.api.ubti import router as ubti_router
 from app.api.chat_like import router as chat_like_router
 from app.api.usage import router as usage_router
-from app.api.recommendation import router as recommendation_router
 from app.db.database import SessionLocal, engine, Base
 
 @asynccontextmanager
@@ -46,7 +45,6 @@ app.include_router(chat_router, prefix="/api", tags=["💬 Chat"])
 app.include_router(ubti_router, prefix="/api", tags=["🎯 UBTI"])
 app.include_router(chat_like_router, prefix="/api", tags=["💜 Likes"])
 app.include_router(usage_router, prefix="/api", tags=["📊 Usage"])
-app.include_router(recommendation_router, prefix="/api", tags=["🎁 Recommendations"])
 
 # 루트 엔드포인트
 @app.get("/", tags=["🏠 Info"])
@@ -63,7 +61,6 @@ async def root():
             "🎯 4-step Multi-turn Conversations",
             "💜 Personalized Tone Support (General/Muneoz)",
             "🔧 Cross-platform Compatibility",
-            "🎁 JSON-based Recommendation Cards"
         ],
         "endpoints": {
             "chat": "/api/chat",
@@ -72,11 +69,6 @@ async def root():
             "ubti_question": "/api/ubti/question",
             "ubti_result": "/api/ubti/result",
             "likes_recommend": "/api/chat/likes",
-            "plan_recommendations": "/api/recommendations/plans",
-            "subscription_recommendations": "/api/recommendations/subscriptions",
-            "all_plans": "/api/plans/all",
-            "all_subscriptions": "/api/subscriptions/all",
-            "compare": "/api/compare"
         },
         "docs": "/docs",
         "redoc": "/redoc"
@@ -96,7 +88,6 @@ async def health_check():
             "usage_analysis": "활성",
             "ubti": "활성",
             "conversation_guard": "활성",
-            "recommendation_cards": "활성"
         }
     }
 
@@ -123,15 +114,10 @@ async def api_status():
                 "status": "active",
                 "description": "좋아요 브랜드 기반 구독 큐레이션"
             },
-            "recommendation_cards": {
-                "status": "active",
-                "description": "JSON 기반 추천 카드 시스템 (프론트엔드 렌더링용)"
-            }
         },
         "ai_models": {
             "intent_classifier": "GPT-4o-mini",
             "conversation_engine": "GPT-4o-mini",
-            "recommendation_engine": "Template-based LangChain + AI Analysis"  # ✅ 업데이트
         }
     }
 
