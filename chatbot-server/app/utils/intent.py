@@ -26,7 +26,7 @@ async def detect_intent(message: str, user_context: dict = None) -> str:
         return "subscription_multi"
 
     # 요금제 - 멀티턴 우선 (매우 구체적인 조건이 아닌 이상)
-    plan_keywords = ["요금제", "5g", "lte", "통화", "데이터", "무제한", "플랜", "추천"]
+    plan_keywords = ["요금제", "5g", "lte", "통화", "데이터", "무제한", "플랜"]
     if any(k in lowered for k in plan_keywords):
         # 매우 구체적인 조건들 (가격대 + 데이터량 동시 언급 등)
         has_price = any(p in lowered for p in ["만원", "천원", "원"])
