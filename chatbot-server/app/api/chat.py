@@ -11,6 +11,22 @@ import re
 
 router = APIRouter()
 
+def get_intent_from_session(req: ChatRequest) -> str:
+    """세션에서 현재 인텐트 파악"""
+    session = get_session(req.session_id)
+
+    # 멀티턴 플로우 확인
+    phone_plan_step = session.get("phone_plan_flow_step", 0)
+    subscription_step = session.get("subscription_flow_step", 0)
+
+    if phone_plan_step > 0:
+        return "phone_plan"
+    elif subscription_step > 0:
+        return "subscription"
+
+    # 세션에 저장된 인텐트 확인 (handle_chat에서 설정)
+    return session.get("current_intent", "unknown")
+
 def is_final_recommendation(req: ChatRequest, ai_response: str) -> bool:
     """최종 추천 결과인지 판단"""
     session = get_session(req.session_id)
@@ -129,60 +145,91 @@ async def chat(req: ChatRequest):
         # 3. 최종 추천 결과인지 확인
         if is_final_recommendation(req, full_ai_response):
 
-            # 4. 요금제 추천이 필요한 경우 DB에서 조회해서 먼저 전송
-            if should_recommend_plans(full_ai_response):
-                recommended_plans = get_recommended_plans(req.message, full_ai_response)
+            # ⭐ 핵심: 인텐트별로 분기 처리
+            current_intent = get_intent_from_session(req)
+            print(f"[DEBUG] Current intent: {current_intent}")
 
-                if recommended_plans:
-                    plan_data = {
-                        "type": "plan_recommendations",
-                        "plans": [
-                            {
-                                "id": plan.id,
-                                "name": plan.name,
-                                "price": plan.price,
-                                "data": plan.data,
-                                "voice": plan.voice,
-                                "speed": plan.speed,
-                                "share_data": plan.share_data,
-                                "sms": plan.sms,
-                                "description": plan.description
-                            }
-                            for plan in recommended_plans
-                        ]
-                    }
-                    yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.1)
+            # 🔥 요금제 추천 상담인 경우 → 요금제 데이터만 전송
+            if current_intent in ["phone_plan", "phone_plan_multi", "telecom_plan", "telecom_plan_direct"]:
+                if should_recommend_plans(full_ai_response):
+                    recommended_plans = get_recommended_plans(req.message, full_ai_response)
 
-            # 5. 구독 서비스 추천이 필요한 경우 DB에서 조회해서 전송
-            if should_recommend_subscriptions(full_ai_response):
-                recommended_subscriptions = get_recommended_subscriptions(full_ai_response)
+                    if recommended_plans:
+                        plan_data = {
+                            "type": "plan_recommendations",
+                            "plans": [
+                                {
+                                    "id": plan.id,
+                                    "name": plan.name,
+                                    "price": plan.price,
+                                    "data": plan.data,
+                                    "voice": plan.voice,
+                                    "speed": plan.speed,
+                                    "share_data": plan.share_data,
+                                    "sms": plan.sms,
+                                    "description": plan.description
+                                }
+                                for plan in recommended_plans
+                            ]
+                        }
+                        yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0.1)
 
-                if recommended_subscriptions:
-                    subscription_data = {
-                        "type": "subscription_recommendations",
-                        "data": recommended_subscriptions
-                    }
-                    yield f"data: {json.dumps(subscription_data, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.1)
+            # 🎬 구독 서비스 추천인 경우 → 구독 데이터만 전송
+            elif current_intent in ["subscription", "subscription_recommend", "subscription_multi"]:
+                if should_recommend_subscriptions(full_ai_response):
+                    recommended_subscriptions = get_recommended_subscriptions(full_ai_response)
+
+                    if recommended_subscriptions:
+                        subscription_data = {
+                            "type": "subscription_recommendations",
+                            "data": recommended_subscriptions
+                        }
+                        yield f"data: {json.dumps(subscription_data, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0.1)
+
+            # 💡 기타 경우 (안전장치)
+            else:
+                print(f"[WARNING] Unknown intent: {current_intent}")
+                # 키워드 기반으로 추천 결정
+                if should_recommend_plans(full_ai_response):
+                    recommended_plans = get_recommended_plans(req.message, full_ai_response)
+                    if recommended_plans:
+                        plan_data = {
+                            "type": "plan_recommendations",
+                            "plans": [
+                                {
+                                    "id": plan.id,
+                                    "name": plan.name,
+                                    "price": plan.price,
+                                    "data": plan.data,
+                                    "voice": plan.voice,
+                                    "speed": plan.speed,
+                                    "share_data": plan.share_data,
+                                    "sms": plan.sms,
+                                    "description": plan.description
+                                }
+                                for plan in recommended_plans
+                            ]
+                        }
+                        yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0.1)
 
         # 6. 스트리밍 시작 신호
         yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
         await asyncio.sleep(0.05)
 
-
         # 7. 전체 응답을 단어 단위로 자연스럽게 스트리밍
-        print(f"[DEBUG] Full AI response: '{full_ai_response}'")  # 디버깅용
+        print(f"[DEBUG] Full AI response: '{full_ai_response}'")
 
-        words = full_ai_response.split()  # 단어로 나누기
+        words = full_ai_response.split()
         for i, word in enumerate(words):
             chunk_data = {
                 "type": "message_chunk",
-                "content": word + (" " if i < len(words) - 1 else "")  # 마지막이 아니면 공백 추가
+                "content": word + (" " if i < len(words) - 1 else "")
             }
             yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.05)
-
 
         # 8. 스트리밍 완료 신호
         yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"

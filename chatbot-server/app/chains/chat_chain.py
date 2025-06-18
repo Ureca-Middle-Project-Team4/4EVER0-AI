@@ -1,4 +1,4 @@
-# app/chains/chat_chain.py (완전 재작성)
+# app/chains/chat_chain.py (구독 멀티턴 수정)
 from typing import Callable, Awaitable
 import asyncio
 from app.utils.redis_client import get_session, save_session
@@ -56,7 +56,6 @@ async def natural_streaming(text: str):
         yield word
         if i < len(words) - 1:
             yield ' '
-        # 자연스러운 타이핑 속도
         await asyncio.sleep(0.05)
 
 def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
@@ -75,7 +74,7 @@ def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
 
 요금제나 구독 서비스 관련해서 뭐든지 물어봐!
 • 요금제 추천
-• 구독 서비스 추천  
+• 구독 서비스 추천
 • UBTI 성향 분석
 • 현재 사용량 체크
 
@@ -104,7 +103,7 @@ def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
 
 저는 LG유플러스 AI 상담사입니다.
 
-요금제 추천부터 구독 서비스까지 도와드릴 수 있어요!
+요금제 추천부터 구독 서비스까지 도워드릴 수 있어요!
 
 어떤 도움이 필요하신가요?"""
         return create_simple_stream(greeting_text)
@@ -158,7 +157,7 @@ def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
     return stream
 
 async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "general") -> Callable[[], Awaitable[str]]:
-    """멀티턴 체인 처리"""
+    """멀티턴 체인 처리 - 구독 서비스 수정"""
     print(f"[DEBUG] get_multi_turn_chain - intent: {intent}, tone: {tone}")
 
     session = get_session(req.session_id)
@@ -167,24 +166,24 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "gener
     # 인텐트별 질문 플로우 선택
     if intent == "phone_plan_multi":
         question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
-        flow_key = "phone_plan_flow"
+        flow_key = "phone_plan_flow_step"  # 키 이름 수정
     elif intent == "subscription_multi":
         question_flow = SUBSCRIPTION_FLOW.get(tone, SUBSCRIPTION_FLOW["general"])
-        flow_key = "subscription_flow"
+        flow_key = "subscription_flow_step"  # 키 이름 수정
     else:
         question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
-        flow_key = "phone_plan_flow"
+        flow_key = "phone_plan_flow_step"
 
     # 현재 단계 확인
-    current_step = session.get(f"{flow_key}_step", 0)
+    current_step = session.get(flow_key, 0)
     user_info = session.get("user_info", {})
 
-    print(f"[DEBUG] Intent: {intent}, Current Step: {current_step}, Message: {message}")
+    print(f"[DEBUG] Intent: {intent}, Current Step: {current_step}, Flow Key: {flow_key}, Message: {message}")
 
     # 첫 번째 메시지가 멀티턴 시작인 경우
     if current_step == 0:
         key, question = question_flow[0]
-        session[f"{flow_key}_step"] = 1
+        session[flow_key] = 1  # flow_key 사용
         session.setdefault("history", [])
         session["history"].append({"role": "user", "content": message})
         session["history"].append({"role": "assistant", "content": question})
@@ -211,7 +210,7 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "gener
         # 다음 질문이 있는지 확인
         if current_step < len(question_flow):
             key, question = question_flow[current_step]
-            session[f"{flow_key}_step"] = current_step + 1
+            session[flow_key] = current_step + 1  # ⭐ flow_key 사용
             session["history"].append({"role": "assistant", "content": question})
             save_session(req.session_id, session)
 
@@ -279,7 +278,7 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone:
     return stream
 
 async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
-    """최종 구독 서비스 추천"""
+    """최종 구독 서비스 추천 - 수정"""
     print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
 
     session = get_session(req.session_id)
