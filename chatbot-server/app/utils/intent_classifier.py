@@ -44,8 +44,12 @@ class EnhancedIntentClassifier:
 """)
 
     async def classify_intent(self, message: str, context: Dict[str, Any] = None) -> str:
-        """AI 기반 정확한 인텐트 분류 (기존 함수명 유지)"""
+        """AI 기반 정확한 인텐트 분류"""
         try:
+            # 입력 검증
+            if not message or len(message.strip()) == 0:
+                return "off_topic_unclear"
+
             chain = self.intent_prompt | self.llm
             response = await chain.ainvoke({"message": message})
             intent = response.content.strip().lower()
@@ -58,9 +62,11 @@ class EnhancedIntentClassifier:
             ]
 
             if intent in valid_intents:
+                print(f"[DEBUG] AI classified intent: {intent}")
                 return intent
             else:
                 # 폴백 로직
+                print(f"[DEBUG] AI returned invalid intent: {intent}, using fallback")
                 return self._fallback_classification(message)
 
         except Exception as e:
@@ -68,13 +74,48 @@ class EnhancedIntentClassifier:
             return self._fallback_classification(message)
 
     def _fallback_classification(self, message: str) -> str:
-        """AI 실패시 키워드 기반 폴백 (내부 로직 향상)"""
-        lowered = message.lower()
+        """AI 실패시 키워드 기반 폴백"""
+        lowered = message.lower().strip()
+
+        # 입력이 너무 짧거나 비어있는 경우
+        if len(lowered) < 2:
+            return "off_topic_unclear"
+
+        # 인사 감지 (우선순위 높음)
+        greeting_keywords = ["안녕", "hi", "hello", "반가", "처음", "시작", "헬로"]
+        if any(k in lowered for k in greeting_keywords):
+            return "greeting"
+
+        # 현재 사용량 관련
+        usage_keywords = ["남은", "현재", "사용량", "얼마나 썼", "잔여", "상태", "확인"]
+        if any(k in lowered for k in usage_keywords):
+            return "current_usage"
+
+        # UBTI 관련
+        ubti_keywords = ["ubti", "성향", "분석", "테스트", "mbti", "타코"]
+        if any(k in lowered for k in ubti_keywords):
+            return "ubti"
+
+        # 요금제 관련 (구체적 vs 일반)
+        plan_keywords = ["요금제", "통신비", "데이터", "통화", "5g", "lte", "플랜"]
+        specific_keywords = ["원", "gb", "무제한", "만원", "게임용", "비즈니스"]
+
+        if any(k in lowered for k in plan_keywords):
+            # 구체적 조건이 있으면 direct
+            if any(k in lowered for k in specific_keywords) and len([k for k in specific_keywords if k in lowered]) >= 2:
+                return "telecom_plan_direct"
+            else:
+                return "telecom_plan"
+
+        # 구독 서비스 관련
+        subscription_keywords = ["구독", "ott", "넷플릭스", "유튜브", "음악", "동영상", "스트리밍"]
+        if any(k in lowered for k in subscription_keywords):
+            return "subscription"
 
         # 재미있는 오프토픽 감지
         interesting_keywords = [
             "영화", "드라마", "음식", "맛집", "여행", "연예인", "취미",
-            "게임", "스포츠", "음악", "책", "카페", "쇼핑"
+            "게임", "스포츠", "음악", "책", "카페", "쇼핑", "연애", "친구"
         ]
         if any(k in lowered for k in interesting_keywords):
             return "off_topic_interesting"
@@ -82,23 +123,25 @@ class EnhancedIntentClassifier:
         # 일반 오프토픽 감지
         boring_keywords = [
             "날씨", "시간", "프로그래밍", "코딩", "파이썬", "자바", "리액트",
-            "공부", "학교", "대학교", "취업", "건강"
+            "공부", "학교", "대학교", "취업", "건강", "운동", "뉴스"
         ]
         if any(k in lowered for k in boring_keywords):
             return "off_topic_boring"
 
-        # 인사
-        if any(k in lowered for k in ["안녕", "hi", "hello", "반가", "처음"]):
-            return "greeting"
+        # 기술 문제 관련
+        tech_keywords = ["오류", "에러", "문제", "안돼", "작동", "버그", "느려"]
+        if any(k in lowered for k in tech_keywords):
+            return "tech_issue"
 
-        # 현재 사용량
-        if any(k in lowered for k in ["남은", "현재", "사용량", "얼마나 썼", "잔여"]):
-            return "current_usage"
+        # 너무 애매하거나 판단하기 어려운 경우
+        unclear_patterns = [
+            len(lowered) < 3,  # 너무 짧음
+            lowered in ["?", "??", "뭐", "음", "어", "그냥"],  # 의미없는 단어
+            "?" in lowered and len(lowered) < 10,  # 짧은 질문
+        ]
 
-        # 너무 짧거나 애매한 경우
-        if len(message.strip()) < 3:
+        if any(unclear_patterns):
             return "off_topic_unclear"
 
-        # 기본적으로 요금제 관련으로 분류
+        # 기본적으로 일반 요금제 관련으로 분류
         return "telecom_plan"
-

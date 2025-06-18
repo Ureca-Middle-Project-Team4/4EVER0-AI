@@ -11,42 +11,82 @@ import re
 router = APIRouter()
 
 def get_recommended_subscriptions_likes(ai_response: str):
-    """좋아요 기반 AI 응답에서 구독 서비스 추천 정보 추출"""
+    """좋아요 기반 AI 응답에서 구독 서비스 추천 정보 추출 - 타입 정확히 구분"""
+
+    # 최종 추천이 아닌 경우 확인
+    if not any(keyword in ai_response for keyword in ['추천', '조합', '메인 구독', '라이프 브랜드']):
+        print(f"[DEBUG] Likes response doesn't contain recommendation keywords")
+        return None
+
     db = SessionLocal()
     try:
         subscription_matches = re.findall(r'(리디|지니|왓챠|넷플릭스|유튜브|스포티파이|U\+모바일tv)', ai_response)
         brand_matches = re.findall(r'(교보문고|스타벅스|올리브영|CGV|롯데시네마)', ai_response)
 
-        recommended_data = {}
+        recommended_subscriptions = []
 
+        # 🔥 1. 메인 구독 찾기 (Subscription 테이블에서)
+        main_subscription = None
         if subscription_matches:
             subscription_name = subscription_matches[0]
-            subscription = db.query(Subscription).filter(
+            main_subscription = db.query(Subscription).filter(
                 Subscription.title.contains(subscription_name)
             ).first()
-            if subscription:
-                recommended_data['main_subscription'] = {
-                    "id": subscription.id,
-                    "title": subscription.title,
-                    "price": subscription.price,
-                    "category": subscription.category,
-                    "image_url": subscription.image_url
-                }
 
+        # AI가 특정 구독을 언급하지 않았다면 기본 추천
+        if not main_subscription:
+            # 기본 메인 구독 추천 (넷플릭스)
+            main_subscription = db.query(Subscription).filter(
+                Subscription.title.contains("넷플릭스")
+            ).first()
+
+            # 넷플릭스가 없으면 첫 번째 구독 서비스
+            if not main_subscription:
+                main_subscription = db.query(Subscription).first()
+
+        # 메인 구독 추가 (type: "main_subscription")
+        if main_subscription:
+            recommended_subscriptions.append({
+                "id": main_subscription.id,
+                "title": main_subscription.title,  # Subscription은 title 필드
+                "image_url": main_subscription.image_url,
+                "category": main_subscription.category,
+                "price": main_subscription.price,
+                "type": "main_subscription"  # 🔥 정확한 타입
+            })
+
+        # 🔥 2. 라이프 브랜드 찾기 (Brand 테이블에서)
+        life_brand = None
         if brand_matches:
             brand_name = brand_matches[0]
-            brand = db.query(Brand).filter(
+            life_brand = db.query(Brand).filter(
                 Brand.name.contains(brand_name)
             ).first()
-            if brand:
-                recommended_data['life_brand'] = {
-                    "id": brand.id,
-                    "name": brand.name,
-                    "image_url": brand.image_url,
-                    "description": brand.description
-                }
 
-        return recommended_data if recommended_data else None
+        # AI가 특정 브랜드를 언급하지 않았다면 기본 추천
+        if not life_brand:
+            # 기본 라이프 브랜드 추천 (스타벅스)
+            life_brand = db.query(Brand).filter(
+                Brand.name.contains("스타벅스")
+            ).first()
+
+            # 스타벅스가 없으면 첫 번째 브랜드
+            if not life_brand:
+                life_brand = db.query(Brand).first()
+
+        # 라이프 브랜드 추가 (type: "life_brand")
+        if life_brand:
+            recommended_subscriptions.append({
+                "id": life_brand.id,
+                "name": life_brand.name,  # Brand는 name 필드
+                "image_url": life_brand.image_url,
+                "description": life_brand.description,
+                "type": "life_brand"  # 🔥 정확한 타입
+            })
+
+        print(f"[DEBUG] Likes combination: main={main_subscription.title if main_subscription else None}, brand={life_brand.name if life_brand else None}")
+
+        return recommended_subscriptions if recommended_subscriptions else None
 
     finally:
         db.close()
@@ -65,14 +105,21 @@ async def chat_likes(req: LikesChatRequest):
             full_ai_response += chunk
             ai_chunks.append(chunk)
 
+        print(f"[DEBUG] Likes full AI response: '{full_ai_response[:200]}...'")
+
         # 3. 구독 서비스 추천이 있으면 DB에서 조회해서 먼저 전송
         recommended_subscriptions = get_recommended_subscriptions_likes(full_ai_response)
 
         if recommended_subscriptions:
             subscription_data = {
                 "type": "subscription_recommendations",
-                "data": recommended_subscriptions
+                "subscriptions": recommended_subscriptions
             }
+            print(f"[DEBUG] Sending likes-based subscription recommendations: {len(recommended_subscriptions)} items")
+            # 각 항목의 타입 확인
+            for item in recommended_subscriptions:
+                print(f"[DEBUG] Item: {item.get('title') or item.get('name')} - Type: {item['type']}")
+
             yield f"data: {json.dumps(subscription_data, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.1)
 

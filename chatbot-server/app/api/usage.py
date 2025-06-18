@@ -25,20 +25,20 @@ async def usage_based_recommendation(
     """
     try:
         print(f"[DEBUG] Usage recommendation request - user_id: {user_id}, tone: {tone}")
-        
+
         # 요금제와 구독 서비스 데이터 조회
         plans = get_all_plans()
         subscriptions = get_products_from_db()
-        
+
         # 사용량 기반 추천 로직
         recommendations = await generate_usage_recommendations(user_id, plans, subscriptions, tone)
-        
+
         return {
             "success": True,
             "message": "사용량 기반 추천이 완료되었습니다.",
             "data": recommendations
         }
-        
+
     except Exception as e:
         print(f"[ERROR] Usage recommendation failed: {e}")
         raise HTTPException(status_code=500, detail=f"추천 생성 실패: {str(e)}")
@@ -66,13 +66,13 @@ async def get_user_usage(user_id: int):
                 "data_trend": "증가"
             }
         }
-        
+
         return {
             "success": True,
             "message": "사용량 조회 성공",
             "data": usage_data
         }
-        
+
     except Exception as e:
         print(f"[ERROR] Usage data retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=f"사용량 조회 실패: {str(e)}")
@@ -91,19 +91,19 @@ async def generate_usage_recommendations(user_id: int, plans: list, subscription
             "peak_time": "저녁시간",
             "trend": "데이터 사용량 증가"
         }
-        
+
         # 요금제 데이터 포맷팅 (오류 방지를 위해 안전하게 처리)
         plans_text = "\n".join([
             f"- {p.name} / {format_price_safely(p.price)} / {p.data or '-'} / {p.voice or '-'}"
             for p in plans
         ])
-        
+
         # 구독 서비스 데이터 포맷팅
         subs_text = "\n".join([
             f"- {s.title} ({s.category}) - {format_price_safely(s.price)}"
             for s in subscriptions
         ])
-        
+
         # 사용량 정보 텍스트화
         usage_text = f"""
 - 데이터 사용량: {usage_data['data_usage']}GB (월평균)
@@ -113,25 +113,25 @@ async def generate_usage_recommendations(user_id: int, plans: list, subscription
 - 주 사용 시간대: {usage_data['peak_time']}
 - 사용 패턴: {usage_data['trend']}
 """
-        
+
         # 프롬프트 생성
         prompt = get_usage_prompt(tone).format(
             usage_info=usage_text,
             plans=plans_text,
             subscriptions=subs_text
         )
-        
+
         # AI 모델 호출
         model = get_chat_model()
         response = await model.ainvoke(prompt)
-        
+
         return {
             "user_id": user_id,
             "usage_analysis": usage_data,
             "recommendation": response.content,
             "tone": tone
         }
-        
+
     except Exception as e:
         print(f"[ERROR] Recommendation generation failed: {e}")
         raise e

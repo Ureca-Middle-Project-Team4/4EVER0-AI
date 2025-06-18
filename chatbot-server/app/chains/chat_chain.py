@@ -1,4 +1,3 @@
-# app/chains/chat_chain.py (구독 멀티턴 수정)
 from typing import Callable, Awaitable
 import asyncio
 from app.utils.redis_client import get_session, save_session
@@ -56,6 +55,7 @@ async def natural_streaming(text: str):
         yield word
         if i < len(words) - 1:
             yield ' '
+        # 자연스러운 타이핑 속도
         await asyncio.sleep(0.05)
 
 def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
@@ -103,7 +103,7 @@ def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
 
 저는 LG유플러스 AI 상담사입니다.
 
-요금제 추천부터 구독 서비스까지 도워드릴 수 있어요!
+요금제 추천부터 구독 서비스까지 도와드릴 수 있어요!
 
 어떤 도움이 필요하신가요?"""
         return create_simple_stream(greeting_text)
@@ -141,185 +141,294 @@ def get_chain_by_intent(intent: str, req: ChatRequest, tone: str = "general"):
         ])
 
     # tone을 고려한 프롬프트 선택
-    prompt = get_prompt_template(intent, tone)
-    model = get_chat_model()
-    chain = prompt | model | StrOutputParser()
-
-    async def stream():
-        generated_response = ""
-        async for chunk in chain.astream(context):
-            if chunk:
-                generated_response += chunk
-                yield chunk
-        session["history"].append({"role": "assistant", "content": generated_response})
-        save_session(req.session_id, session)
-
-    return stream
-
-async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "general") -> Callable[[], Awaitable[str]]:
-    """멀티턴 체인 처리 - 구독 서비스 수정"""
-    print(f"[DEBUG] get_multi_turn_chain - intent: {intent}, tone: {tone}")
-
-    session = get_session(req.session_id)
-    message = req.message
-
-    # 인텐트별 질문 플로우 선택
-    if intent == "phone_plan_multi":
-        question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
-        flow_key = "phone_plan_flow_step"  # 키 이름 수정
-    elif intent == "subscription_multi":
-        question_flow = SUBSCRIPTION_FLOW.get(tone, SUBSCRIPTION_FLOW["general"])
-        flow_key = "subscription_flow_step"  # 키 이름 수정
-    else:
-        question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
-        flow_key = "phone_plan_flow_step"
-
-    # 현재 단계 확인
-    current_step = session.get(flow_key, 0)
-    user_info = session.get("user_info", {})
-
-    print(f"[DEBUG] Intent: {intent}, Current Step: {current_step}, Flow Key: {flow_key}, Message: {message}")
-
-    # 첫 번째 메시지가 멀티턴 시작인 경우
-    if current_step == 0:
-        key, question = question_flow[0]
-        session[flow_key] = 1  # flow_key 사용
-        session.setdefault("history", [])
-        session["history"].append({"role": "user", "content": message})
-        session["history"].append({"role": "assistant", "content": question})
-        save_session(req.session_id, session)
-
-        print(f"[DEBUG] Starting multiturn flow, asking first question")
+    try:
+        prompt = get_prompt_template(intent, tone)
+        model = get_chat_model()
+        chain = prompt | model | StrOutputParser()
 
         async def stream():
-            async for chunk in natural_streaming(question):
-                yield chunk
+            generated_response = ""
+            async for chunk in chain.astream(context):
+                if chunk:
+                    generated_response += chunk
+                    yield chunk
+            session["history"].append({"role": "assistant", "content": generated_response})
+            save_session(req.session_id, session)
+
         return stream
+    except Exception as e:
+        print(f"[ERROR] Chain creation failed: {e}")
+        # 에러 발생 시 폴백 응답
+        error_text = "죄송해요, 일시적인 문제가 발생했어요. 다시 시도해주세요! 😅" if tone == "general" else "앗! 뭔가 꼬였나봐! 다시 말해줘~ 😵"
+        return create_simple_stream(error_text)
 
-    # 이전 답변 저장하고 다음 질문
-    elif current_step > 0 and current_step <= len(question_flow):
-        # 이전 질문의 답변 저장
-        prev_key = question_flow[current_step - 1][0]
-        user_info[prev_key] = message
-        session["user_info"] = user_info
-        session.setdefault("history", [])
-        session["history"].append({"role": "user", "content": message})
+async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "general") -> Callable[[], Awaitable[str]]:
+    """멀티턴 체인 처리 - 디버깅 강화"""
 
-        print(f"[DEBUG] Saved {prev_key}: {message}")
+    print(f"[DEBUG] ========== GET_MULTI_TURN_CHAIN START ==========")
+    print(f"[DEBUG] Input - intent: '{intent}', tone: '{tone}', message: '{req.message}'")
 
-        # 다음 질문이 있는지 확인
-        if current_step < len(question_flow):
-            key, question = question_flow[current_step]
-            session[flow_key] = current_step + 1  # ⭐ flow_key 사용
+    try:
+        session = get_session(req.session_id)
+        message = req.message
+
+        # 인텐트별 질문 플로우 선택
+        if intent == "phone_plan_multi":
+            question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
+            flow_key = "phone_plan_flow"
+            print(f"[DEBUG] Selected PHONE_PLAN_FLOW for tone '{tone}'")
+        elif intent == "subscription_multi":
+            question_flow = SUBSCRIPTION_FLOW.get(tone, SUBSCRIPTION_FLOW["general"])
+            flow_key = "subscription_flow"
+            print(f"[DEBUG] Selected SUBSCRIPTION_FLOW for tone '{tone}'")
+        else:
+            question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
+            flow_key = "phone_plan_flow"
+            print(f"[DEBUG] Default to PHONE_PLAN_FLOW for unknown intent '{intent}'")
+        if session.get(f"{flow_key}_step", None) not in range(1, len(question_flow)+1):
+            session[f"{flow_key}_step"] = 0
+            session["user_info"] = {}
+            save_session(req.session_id, session)
+
+
+        # 현재 단계 확인
+        current_step = session.get(f"{flow_key}_step", 0)
+        user_info = session.get("user_info", {})
+
+        print(f"[DEBUG] Flow state - flow_key: '{flow_key}', current_step: {current_step}")
+        print(f"[DEBUG] Current user_info: {user_info}")
+        print(f"[DEBUG] Question flow length: {len(question_flow)}")
+
+        # 첫 번째 메시지가 멀티턴 시작인 경우
+        if current_step == 0:
+            print(f"[DEBUG] >>> STARTING NEW MULTI-TURN FLOW <<<")
+            key, question = question_flow[0]
+            print(f"[DEBUG] First question - key: '{key}', question: '{question}'")
+
+            session[f"{flow_key}_step"] = 1
+            session.setdefault("history", [])
+            session["history"].append({"role": "user", "content": message})
             session["history"].append({"role": "assistant", "content": question})
             save_session(req.session_id, session)
 
-            print(f"[DEBUG] Asking next question (step {current_step + 1})")
+            print(f"[DEBUG] Session updated - step set to 1, starting multiturn flow")
 
             async def stream():
                 async for chunk in natural_streaming(question):
                     yield chunk
             return stream
-        else:
-            # 모든 질문 완료 → 최종 추천
-            print(f"[DEBUG] All questions completed. Generating final recommendation...")
 
-            if intent == "phone_plan_multi":
-                return await get_final_plan_recommendation(req, user_info, tone)
-            elif intent == "subscription_multi":
-                return await get_final_subscription_recommendation(req, user_info, tone)
+        # 이전 답변 저장하고 다음 질문
+        elif current_step > 0 and current_step <= len(question_flow):
+            print(f"[DEBUG] >>> CONTINUING MULTI-TURN FLOW (step {current_step}) <<<")
 
-    # 안전장치
-    print(f"[DEBUG] Unexpected flow state - falling back to final recommendation")
-    if intent == "phone_plan_multi":
-        return await get_final_plan_recommendation(req, user_info, tone)
-    elif intent == "subscription_multi":
-        return await get_final_subscription_recommendation(req, user_info, tone)
+            # 이전 질문의 답변 저장
+            prev_key = question_flow[current_step - 1][0]
+            user_info[prev_key] = message
+            session["user_info"] = user_info
+            session.setdefault("history", [])
+            session["history"].append({"role": "user", "content": message})
 
-async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone: str = "general"):
-    """최종 요금제 추천"""
-    print(f"[DEBUG] get_final_plan_recommendation - tone: {tone}")
+            print(f"[DEBUG] Saved answer - {prev_key}: '{message}'")
 
-    session = get_session(req.session_id)
-    plans = get_all_plans()
+            # 다음 질문이 있는지 확인
+            if current_step < len(question_flow):
+                key, question = question_flow[current_step]
+                print(f"[DEBUG] Next question - key: '{key}', question: '{question}'")
 
-    merged_info = {
-        "data_usage": "미설정", "call_usage": "미설정",
-        "services": "미설정", "budget": "미설정",
-        **user_info
-    }
+                session[f"{flow_key}_step"] = current_step + 1
+                session["history"].append({"role": "assistant", "content": question})
+                save_session(req.session_id, session)
 
-    user_info_text = f"""- 데이터 사용량: {merged_info['data_usage']}\\n\\n- 통화 사용량: {merged_info['call_usage']}\\n\\n- 선호 서비스: {merged_info['services']}\\n\\n- 예산: {merged_info['budget']}"""
+                print(f"[DEBUG] Session updated - step set to {current_step + 1}")
 
-    context = {
-        "user_info": user_info_text,
-        "plans": "\\n\\n".join([f"- {p.name} / {p.price} / {p.data} / {p.voice}" for p in plans]),
-        "message": req.message,
-        "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
-    }
+                async def stream():
+                    async for chunk in natural_streaming(question):
+                        yield chunk
+                return stream
+            else:
+                # 모든 질문 완료 → 최종 추천
+                print(f"[DEBUG] >>> ALL QUESTIONS COMPLETED - GENERATING FINAL RECOMMENDATION <<<")
 
-    prompt = get_prompt_template("phone_plan_multi", tone)
-    model = get_chat_model()
-    chain = prompt | model | StrOutputParser()
+                if intent == "phone_plan_multi":
+                    print(f"[DEBUG] Calling get_final_plan_recommendation")
+                    return await get_final_plan_recommendation(req, user_info, tone)
+                elif intent == "subscription_multi":
+                    print(f"[DEBUG] Calling get_final_subscription_recommendation")
+                    return await get_final_subscription_recommendation(req, user_info, tone)
 
-    async def stream():
-        generated_response = ""
-        async for chunk in chain.astream(context):
-            if chunk:
-                generated_response += chunk
-                yield chunk
-                await asyncio.sleep(0.01)
+        # 안전장치
+        print(f"[DEBUG] >>> UNEXPECTED FLOW STATE - FALLING BACK <<<")
+        print(f"[DEBUG] current_step: {current_step}, flow_length: {len(question_flow)}")
 
-        session["history"].append({"role": "assistant", "content": generated_response})
-        # 플로우 완료 후 초기화
+        if intent == "phone_plan_multi":
+            return await get_final_plan_recommendation(req, user_info, tone)
+        elif intent == "subscription_multi":
+            return await get_final_subscription_recommendation(req, user_info, tone)
+
+    except Exception as e:
+        print(f"[ERROR] Multi-turn chain failed: {e}")
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+
+        # 에러 발생 시 플로우 초기화 및 에러 응답
+        session = get_session(req.session_id)
         session.pop("phone_plan_flow_step", None)
-        save_session(req.session_id, session)
-
-    return stream
-
-async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
-    """최종 구독 서비스 추천 - 수정"""
-    print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
-
-    session = get_session(req.session_id)
-
-    from app.db.subscription_db import get_products_from_db
-    from app.db.brand_db import get_life_brands_from_db
-
-    main_items = get_products_from_db()
-    life_items = get_life_brands_from_db()
-
-    merged_info = {
-        "content_type": "미설정", "device_usage": "미설정",
-        "time_usage": "미설정", "preference": "미설정",
-        **user_info
-    }
-
-    user_info_text = f"""- 선호 콘텐츠: {merged_info['content_type']}\\n\\n- 사용 기기: {merged_info['device_usage']}\\n\\n- 시청 시간: {merged_info['time_usage']}\\n\\n- 선호 장르/브랜드: {merged_info['preference']}"""
-
-    context = {
-        "main": "\\n\\n".join([f"- {p.title} ({p.category}) - {p.price}원" for p in main_items]),
-        "life": "\\n\\n".join([f"- {b.name}" for b in life_items]),
-        "user_info": user_info_text,
-        "message": req.message,
-        "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
-    }
-
-    prompt = get_prompt_template("subscription_recommend", tone)
-    model = get_chat_model()
-    chain = prompt | model | StrOutputParser()
-
-    async def stream():
-        generated_response = ""
-        async for chunk in chain.astream(context):
-            if chunk:
-                generated_response += chunk
-                yield chunk
-                await asyncio.sleep(0.01)
-
-        session["history"].append({"role": "assistant", "content": generated_response})
-        # 플로우 완료 후 초기화
         session.pop("subscription_flow_step", None)
         save_session(req.session_id, session)
 
-    return stream
+        error_text = "죄송해요, 질문 과정에서 문제가 발생했어요. 처음부터 다시 시작해주세요! 😅" if tone == "general" else "앗! 뭔가 꼬였나봐! 처음부터 다시 해보자~ 😵"
+        return create_simple_stream(error_text)
+
+async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone: str = "general"):
+    """최종 요금제 추천 - 카드 데이터 포함"""
+    print(f"[DEBUG] get_final_plan_recommendation - tone: {tone}")
+
+    try:
+        session = get_session(req.session_id)
+        plans = get_all_plans()
+
+        merged_info = {
+            "data_usage": "미설정", "call_usage": "미설정",
+            "services": "미설정", "budget": "미설정",
+            **user_info
+        }
+
+        user_info_text = f"""- 데이터 사용량: {merged_info['data_usage']}\\n\\n- 통화 사용량: {merged_info['call_usage']}\\n\\n- 선호 서비스: {merged_info['services']}\\n\\n- 예산: {merged_info['budget']}"""
+
+        context = {
+            "user_info": user_info_text,
+            "plans": "\\n\\n".join([f"- {p.name} / {p.price} / {p.data} / {p.voice}" for p in plans]),
+            "message": req.message,
+            "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
+        }
+
+        prompt = get_prompt_template("phone_plan_multi", tone)
+        model = get_chat_model()
+        chain = prompt | model | StrOutputParser()
+
+        # 🔥 핵심: 최종 추천임을 표시하는 특별한 응답 생성
+        async def stream():
+            generated_response = ""
+            try:
+                async for chunk in chain.astream(context):
+                    if chunk:
+                        generated_response += chunk
+                        yield chunk
+                        await asyncio.sleep(0.01)
+
+                # 🔥 최종 추천 표시를 위한 특별한 마커 추가
+                if not any(keyword in generated_response for keyword in ["추천드립니다", "추천해드릴게", "찰떡 요금제"]):
+                    # AI가 추천 키워드를 포함하지 않았다면 강제로 추가
+                    final_marker = " 위 요금제들을 추천드립니다!" if tone == "general" else " 이 요금제들 완전 추천!"
+                    generated_response += final_marker
+                    yield final_marker
+
+                session["history"].append({"role": "assistant", "content": generated_response})
+
+                # 🔥 최종 추천 완료 표시
+                session["is_final_recommendation"] = True
+                session["recommendation_type"] = "plan"
+
+                # 플로우 완료 후 초기화
+                session.pop("phone_plan_flow_step", None)
+                save_session(req.session_id, session)
+
+            except Exception as e:
+                print(f"[ERROR] Final recommendation streaming failed: {e}")
+                # 스트리밍 중 에러 발생 시 폴백 응답
+                fallback_text = "요금제 추천 중 문제가 발생했어요. 다시 시도해주세요! 😅" if tone == "general" else "추천하다가 뭔가 꼬였어! 다시 해보자~ 😵"
+                yield fallback_text
+                session.pop("phone_plan_flow_step", None)
+                save_session(req.session_id, session)
+
+        return stream
+
+    except Exception as e:
+        print(f"[ERROR] Final plan recommendation setup failed: {e}")
+        # 설정 단계에서 에러 발생 시
+        session = get_session(req.session_id)
+        session.pop("phone_plan_flow_step", None)
+        save_session(req.session_id, session)
+
+        error_text = "요금제 추천 준비 중 문제가 발생했어요. 다시 시도해주세요! 😅" if tone == "general" else "추천 준비하다가 뭔가 꼬였어! 다시 해보자~ 😵"
+        return create_simple_stream(error_text)
+
+async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
+    """최종 구독 서비스 추천 - 카드 데이터 포함"""
+    print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
+
+    try:
+        session = get_session(req.session_id)
+
+        from app.db.subscription_db import get_products_from_db
+        from app.db.brand_db import get_life_brands_from_db
+
+        main_items = get_products_from_db()
+        life_items = get_life_brands_from_db()
+
+        merged_info = {
+            "content_type": "미설정", "device_usage": "미설정",
+            "time_usage": "미설정", "preference": "미설정",
+            **user_info
+        }
+
+        user_info_text = f"""- 선호 콘텐츠: {merged_info['content_type']}\\n\\n- 사용 기기: {merged_info['device_usage']}\\n\\n- 시청 시간: {merged_info['time_usage']}\\n\\n- 선호 장르/브랜드: {merged_info['preference']}"""
+
+        context = {
+            "main": "\\n\\n".join([f"- {p.title} ({p.category}) - {p.price}원" for p in main_items]),
+            "life": "\\n\\n".join([f"- {b.name}" for b in life_items]),
+            "user_info": user_info_text,
+            "message": req.message,
+            "history": "\\n\\n".join([f"{m['role']}: {m['content']}" for m in session["history"]])
+        }
+
+        prompt = get_prompt_template("subscription_recommend", tone)
+        model = get_chat_model()
+        chain = prompt | model | StrOutputParser()
+
+        # 핵심: 최종 추천임을 표시하는 특별한 응답 생성
+        async def stream():
+            generated_response = ""
+            try:
+                async for chunk in chain.astream(context):
+                    if chunk:
+                        generated_response += chunk
+                        yield chunk
+                        await asyncio.sleep(0.01)
+
+                # 최종 추천 표시를 위한 특별한 마커 추가
+                if not any(keyword in generated_response for keyword in ["추천드립니다", "추천해드릴게", "찰떡", "위 조합을 추천드립니다", "이 조합 완전 추천"]):
+                    final_marker = " 위 조합을 추천드립니다!" if tone == "general" else " 이 조합 완전 추천!"
+                    generated_response += final_marker
+                    yield final_marker
+
+                session["history"].append({"role": "assistant", "content": generated_response})
+
+                # 최종 추천 완료 표시
+                session["is_final_recommendation"] = True
+                session["recommendation_type"] = "subscription"
+
+                # 플로우 완료 후 초기화
+                session.pop("subscription_flow_step", None)
+                save_session(req.session_id, session)
+
+            except Exception as e:
+                print(f"[ERROR] Final subscription streaming failed: {e}")
+                # 스트리밍 중 에러 발생 시 폴백 응답
+                fallback_text = "구독 서비스 추천 중 문제가 발생했어요. 다시 시도해주세요! 😅" if tone == "general" else "추천하다가 뭔가 꼬였어! 다시 해보자~ 😵"
+                yield fallback_text
+                session.pop("subscription_flow_step", None)
+                save_session(req.session_id, session)
+
+        return stream
+
+    except Exception as e:
+        print(f"[ERROR] Final subscription recommendation setup failed: {e}")
+        # 설정 단계에서 에러 발생 시
+        session = get_session(req.session_id)
+        session.pop("subscription_flow_step", None)
+        save_session(req.session_id, session)
+
+        error_text = "구독 서비스 추천 준비 중 문제가 발생했어요. 다시 시도해주세요! 😅" if tone == "general" else "추천 준비하다가 뭔가 꼬였어! 다시 해보자~ 😵"
+        return create_simple_stream(error_text)

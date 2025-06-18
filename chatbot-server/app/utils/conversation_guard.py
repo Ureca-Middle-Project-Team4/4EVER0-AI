@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from langchain_openai import ChatOpenAI
 
 class ConversationGuard:
-    """대화 가드레일 시스템 (기존 클래스명 유지)"""
+    """대화 가드레일 시스템"""
 
     def __init__(self):
         self.llm = ChatOpenAI(
@@ -14,26 +14,32 @@ class ConversationGuard:
         )
 
     async def handle_off_topic(self, message: str, tone: str = "general") -> str:
-        """오프토픽 응답 생성 (기존 함수명 유지, 내부 로직 향상)"""
+        """오프토픽 응답 생성 - 개선된 버전"""
 
-        # 내부에서 세분화된 처리
+        # 세분화된 인텐트에 따른 처리
+        from app.utils.intent_classifier import EnhancedIntentClassifier
         intent_classifier = EnhancedIntentClassifier()
         detailed_intent = await intent_classifier.classify_intent(message)
+
+        print(f"[DEBUG] Off-topic detailed intent: {detailed_intent}")
 
         if detailed_intent == "off_topic_interesting":
             return await self._handle_interesting_off_topic(message, tone)
         elif detailed_intent == "off_topic_unclear":
             return await self._handle_unclear_question(message, tone)
-        else:
+        elif detailed_intent == "off_topic_boring":
             return await self._handle_boring_off_topic(message, tone)
+        else:
+            # 기본 오프토픽 처리
+            return await self._handle_general_off_topic(message, tone)
 
     async def _handle_interesting_off_topic(self, message: str, tone: str) -> str:
-        """재미있지만 전문분야가 아닌 주제 응답 (내부 함수)"""
+        """재미있지만 전문분야가 아닌 주제 응답"""
         if tone == "muneoz":
             responses = [
-                "오~ 완전 느좋 주제네! 🤩\n근데 나는 그거보다 요금제가 더 재밌어! ㅋㅋㅋ\n\우리 요금제 얘기 해볼까? 🐙✨",
-                "헉 그것도 느좋 주제인데! 😎\n하지만 내 추구미는 완전 요금제 전문가거든~\n\n그냥 통신 얘기로 넘어가자! 🤟💜",
-                "와 싹싹김치! 재밌는 얘기네~ 🔥\n근데 나는 요금제 큐레이터라서 그쪽은 잘 몰라! 😅\n\n우리 요금제나 구독 얘기 할까? 🐙"
+                "오~ 완전 느좋한 주제네! 🤩\n근데 나는 그거보다 요금제가 더 재밌어! ㅋㅋㅋ\n\n럭키비키하게 요금제 얘기 해볼까? 🐙✨",
+                "헉 그것도 지리고 있는 주제인데! 😎\n하지만 내 추구미는 완전 요금제 전문가거든~\n\n칠가이하게 통신 얘기로 넘어가자! 🤟💜",
+                "와 싹싹김치! 재밌는 얘기네~ 🔥\n근데 나는 요금제 큐레이터라서 그쪽은 핑프야! 😅\n\n알잘딱깔센하게 요금제나 구독 얘기 할까? 🐙"
             ]
         else:
             responses = [
@@ -45,12 +51,12 @@ class ConversationGuard:
         return random.choice(responses)
 
     async def _handle_boring_off_topic(self, message: str, tone: str) -> str:
-        """일반적인 오프토픽 응답 (내부 함수)"""
+        """일반적인 오프토픽 응답"""
         if tone == "muneoz":
             responses = [
                 "음... 그건 내가 잘 모르겠어! 😅\n나는 요금제랑 구독만 완전 지리고 있거든!\n\n뭔가 통신 관련 궁금한 거 없어? 🐙",
-                "아 그런 건 내 전문분야가 아니야~ 🤔\n대신 요금제는 퀸의 마인드로 추천해줄 수 있어!\n\n럭키비키하게 요금제 얘기 해보자! 🤟",
-                "칠가이같은 질문이네! 😂\n나는 LG유플러스 전문가라서 그런 건 모르겠어~\n\n허거덩거덩스?! 요금제 상담 받아보는 건 어때? ✨"
+                "아 그런 건 내 전문분야가 아니야~ 🤔\n대신 요금제는 퀸의 마인드로 추천해줄 수 있어!\n\n칠가이하게 요금제 얘기 해보자! 🤟",
+                "핑프같은 질문이네! 😂\n나는 LG유플러스 전문가라서 그런 건 모르겠어~\n\n헬시플레저하게 요금제 상담 받아보는 건 어때? ✨"
             ]
         else:
             responses = [
@@ -62,12 +68,12 @@ class ConversationGuard:
         return random.choice(responses)
 
     async def _handle_unclear_question(self, message: str, tone: str) -> str:
-        """질문을 이해하지 못했을 때 응답 (내부 함수)"""
+        """질문을 이해하지 못했을 때 응답"""
         if tone == "muneoz":
             responses = [
                 "어? 뭔 말인지 잘 모르겠어! 😵‍💫\n\n혹시 이런 거 물어본 거야?\n• 요금제 추천\n• 구독 서비스 추천\n• 현재 사용량 확인\n• UBTI 성향 분석\n\n알잘딱깔센하게 다시 말해줘! 🤟",
-                "음... 내가 이해를 못한 것 같아! 🤯\n\n나는 이런 거 도와줄 수 있어:\n• 네 추구미에 맞는 요금제 찾기\n• 구독 서비스 큐레이팅\n• 데이터/통화 사용량 안내\n• 성향 분석\n\n다시 물어보는 것도 럭키비키잖앙?! 💜",
-                "앗! 내가 뭔가 놓친 것 같아! 😅\n\n혹시 이런 얘기였어?\n• 럭키비키한 요금제 찾기\n• 너의 추구미 구독 서비스\n• 현재 요금제 상태 확인\n• UBTI 테스트\n\n다시 설명해줄래? 🐙✨"
+                "음... 내가 이해를 못한 것 같아! 🤯\n\n나는 이런 거 도와줄 수 있어:\n• 네 추구미에 맞는 요금제 찾기\n• 구독 서비스 큐레이팅\n• 데이터/통화 사용량 안내\n• 성향 분석\n\n칠가이하게 다시 물어봐~ 💜",
+                "앗! 내가 뭔가 놓친 것 같아! 😅\n\n혹시 이런 얘기였어?\n• 럭키비키한 요금제 찾기\n• 지리고 있는 구독 서비스\n• 현재 요금제 상태 확인\n• UBTI 테스트\n\n느좋하게 다시 설명해줄래? 🐙✨"
             ]
         else:
             responses = [
@@ -78,8 +84,33 @@ class ConversationGuard:
 
         return random.choice(responses)
 
+    async def _handle_general_off_topic(self, message: str, tone: str) -> str:
+        """일반적인 오프토픽 응답 (폴백)"""
+        if tone == "muneoz":
+            return """그건 나도 잘 모르겠어! 😅
+
+나는 요금제랑 구독 서비스만 완전 자신 있거든~
+
+이런 거 도와줄 수 있어:
+• 럭키비키한 요금제 찾기
+• 지리고 있는 구독 추천
+• 데이터 사용량 체크
+• UBTI 성향 분석
+
+칠가이하게 뭔가 물어봐~ 🤟💜"""
+        else:
+            return """죄송해요, 그 분야는 제가 도움드리기 어려워요. 😔
+
+저는 다음과 같은 서비스를 전문적으로 제공합니다:
+• 요금제 추천 및 상담
+• 구독 서비스 추천
+• 사용량 기반 분석
+• 성향 분석 안내
+
+통신 관련해서 궁금한 점이 있으시면 언제든 말씀해주세요! 😊"""
+
     async def handle_tech_issue(self, message: str, tone: str = "general") -> str:
-        """기술적 문제 응답 (기존 함수명 유지)"""
+        """기술적 문제 응답"""
         if tone == "muneoz":
             return """헉! 뭔가 서버 쪽에서 문제가 생긴 것 같아! 😵‍💫
 
@@ -94,12 +125,12 @@ class ConversationGuard:
 그런 문의사항이 있으시면 언제든 말씀해주세요! 😊"""
 
     async def handle_greeting(self, message: str, tone: str = "general") -> str:
-        """인사 응답 (기존 함수명 유지, 2025년 유행어 반영)"""
+        """인사 응답"""
         if tone == "muneoz":
             greetings = [
-                "안뇽! 🤟 나는 무너야~ 🐙\n\n이 넓은 세상에서 우리가 만났다니.. 완전 럭키비키잖앙! ✨\n요금제랑 구독 전문가라서 완전 자신 있어!\n\n네 추구미에 딱 맞는 거 찾아줄게~ 💜",
-                "야호! 🎉 무너 등장!\n\n무너즈 특) 요금제 무너한테 무러봄 ㅎㅎ\n알잘딱깔센하게 완전 찰떡인 거 추천해줄게! 🔥",
-                "안뇽안뇽! 🤟\n\n무너 귀엽고 깜찍하게 등장~💜\n느좋한 요금제든 구독이든 뭐든지 말해봐~ 🐙\n\n싹싹김치!🥬🌶️"
+                "안뇽! 🤟 나는 무너야~ 🐙\n\n완전 럭키비키하게 만났네! ✨\n요금제랑 구독 전문가라서 완전 자신 있어!\n\n네 추구미에 딱 맞는 거 찾아줄게~ 💜",
+                "야호! 🎉 무너 등장!\n\n칠가이하게 요금제 얘기 하러 왔구나?\n알잘딱깔센하게 완전 찰떡인 거 추천해줄게! 🔥",
+                "안뇽안뇽! 🤟\n\n나는 LG유플러스 큐레이터 무너야!\n느좋한 요금제든 지리고 있는 구독이든 뭐든지 말해봐~ 🐙💜\n\n싹싹김치! 🎊"
             ]
         else:
             greetings = [
@@ -111,12 +142,12 @@ class ConversationGuard:
         return random.choice(greetings)
 
     async def handle_unknown(self, message: str, tone: str = "general") -> str:
-        """알 수 없는 요청 처리 (기존 함수명 유지, 내부에서 unclear 처리)"""
+        """알 수 없는 요청 처리"""
         return await self._handle_unclear_question(message, tone)
 
     # ============= 추가된 오류 상황 처리 함수들 =============
     async def handle_loading_failure(self, tone: str = "general") -> str:
-        """로딩 실패 시 응답 (새 함수)"""
+        """로딩 실패 시 응답"""
         if tone == "muneoz":
             responses = [
                 "앗! 뭔가 삐끗했나봐! 😵\n잠깐만 기다려줘~ 금방 다시 시도해볼게!\n\n칠가이하게 기다려줘! 🐙💜",
@@ -133,7 +164,7 @@ class ConversationGuard:
         return random.choice(responses)
 
     async def handle_api_error(self, tone: str = "general") -> str:
-        """API 오류 시 응답 (새 함수)"""
+        """API 오류 시 응답"""
         if tone == "muneoz":
             responses = [
                 "어머 뭔가 서버가 삐끗했나봐! 😱\n내가 아니라 시스템 문제야!\n\n잠깐만 기다렸다가 다시 물어봐줘~ 🐙",
@@ -150,7 +181,7 @@ class ConversationGuard:
         return random.choice(responses)
 
     async def handle_timeout_error(self, tone: str = "general") -> str:
-        """타임아웃 오류 시 응답 (새 함수)"""
+        """타임아웃 오류 시 응답"""
         if tone == "muneoz":
             return """으악! 시간이 너무 오래 걸려서 타임아웃났어! ⏰💥
 
