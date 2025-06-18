@@ -5,15 +5,19 @@ client = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 def get_session(session_id: str) -> dict:
     """세션 데이터 조회"""
+    if not session_id:
+        print("[ERROR] session_id is None or empty!")
+        return {}
+
     try:
         data = client.get(session_id)
         session_data = json.loads(data) if data else {}
-
-        print(f"[DEBUG] Redis get_session: {list(session_data.keys())}")
+        print(f"[DEBUG] Redis get_session('{session_id}') → keys: {list(session_data.keys())}")
         return session_data
     except Exception as e:
         print(f"[ERROR] Redis get session failed: {e}")
         return {}
+
 
 def save_session(session_id: str, data: dict):
     """세션 데이터 저장 - 🔥 멀티턴 키 보존"""
