@@ -1,9 +1,8 @@
-# app/services/handle_chat.py - 완전 수정된 최종 버전
 import asyncio
 from app.schemas.chat import ChatRequest
-from app.utils.intent import detect_intent, handle_off_topic_response, handle_tech_issue_response
+from app.utils.intent import detect_intent, handle_off_topic_response, handle_tech_issue_response, handle_greeting_response
 from app.chains.chat_chain import get_chain_by_intent, get_multi_turn_chain
-from app.utils.redis_client import get_session
+from app.utils.redis_client import get_session, save_session
 
 def create_simple_stream(text: str):
     """간단한 텍스트를 스트리밍으로 변환"""
@@ -17,20 +16,34 @@ def create_simple_stream(text: str):
     return stream
 
 async def handle_chat(req: ChatRequest):
-    """향상된 채팅 핸들러 - 완전 수정 버전"""
+    """통일된 세션 키를 사용하는 채팅 핸들러"""
 
     tone = getattr(req, 'tone', 'general')
     print(f"[DEBUG] ========== HANDLE_CHAT START ==========")
     print(f"[DEBUG] Input - tone: {tone}, message: '{req.message}'")
 
-    # 1. 세션에서 멀티턴 진행 상태 확인
+    # 세션에서 멀티턴 진행 상태 확인 - 통일된 키 사용
     session = get_session(req.session_id)
-    phone_plan_step = session.get("phone_plan_flow_step", 0)
-    subscription_step = session.get("subscription_flow_step", 0)
+
+    # 기존 키들을 통일된 키로 변환
+    phone_plan_step = session.get("phone_plan_flow_step", 0) or session.get("plan_step", 0)
+    subscription_step = session.get("subscription_flow_step", 0) or session.get("subscription_step", 0)
+
+    # 통일된 키로 저장
+    if session.get("plan_step") and not session.get("phone_plan_flow_step"):
+        session["phone_plan_flow_step"] = session.pop("plan_step")
+        session["user_info"] = session.pop("plan_info", {})
+        save_session(req.session_id, session)
+
+    if session.get("subscription_step") and not session.get("subscription_flow_step"):
+        session["subscription_flow_step"] = session.pop("subscription_step")
+        session["user_info"] = session.pop("subscription_info", {})
+        save_session(req.session_id, session)
 
     print(f"[DEBUG] Session state - phone_plan_step: {phone_plan_step}, subscription_step: {subscription_step}")
+    print(f"[DEBUG] Session keys: {list(session.keys())}")
 
-    # 2. 멀티턴이 진행 중이면 해당 플로우 계속 진행
+    # 🔥 멀티턴이 진행 중이면 해당 플로우 계속 진행
     if phone_plan_step > 0:
         print(f"[DEBUG] >>> CONTINUING PHONE PLAN MULTI-TURN (step: {phone_plan_step}) <<<")
         try:
@@ -39,9 +52,11 @@ async def handle_chat(req: ChatRequest):
             print(f"[ERROR] Phone plan multi-turn failed: {e}")
             # 플로우 초기화 후 에러 응답
             session.pop("phone_plan_flow_step", None)
-            from app.utils.redis_client import save_session
+            session.pop("plan_step", None)
+            session.pop("user_info", None)
+            session.pop("plan_info", None)
             save_session(req.session_id, session)
-            return create_simple_stream(await handle_loading_error_response(tone))
+            return create_simple_stream("요금제 질문 중 오류가 발생했어요. 처음부터 다시 시작해주세요! 😅")
 
     elif subscription_step > 0:
         print(f"[DEBUG] >>> CONTINUING SUBSCRIPTION MULTI-TURN (step: {subscription_step}) <<<")
@@ -51,11 +66,13 @@ async def handle_chat(req: ChatRequest):
             print(f"[ERROR] Subscription multi-turn failed: {e}")
             # 플로우 초기화 후 에러 응답
             session.pop("subscription_flow_step", None)
-            from app.utils.redis_client import save_session
+            session.pop("subscription_step", None)
+            session.pop("user_info", None)
+            session.pop("subscription_info", None)
             save_session(req.session_id, session)
-            return create_simple_stream(await handle_loading_error_response(tone))
+            return create_simple_stream("구독 서비스 질문 중 오류가 발생했어요. 처음부터 다시 시작해주세요! 😅")
 
-    # 3. 새로운 대화 - AI 기반 인텐트 감지
+    # 🔥 새로운 대화 - AI 기반 인텐트 감지
     print(f"[DEBUG] >>> STARTING NEW CONVERSATION - DETECTING INTENT <<<")
     try:
         intent = await detect_intent(req.message)
@@ -64,27 +81,31 @@ async def handle_chat(req: ChatRequest):
         print(f"[ERROR] Intent detection failed: {e}")
         intent = "off_topic_unclear"
 
-    # 4. 인텐트별 처리 - 최종 수정!
+    # 🔥 인텐트별 처리
     print(f"[DEBUG] >>> PROCESSING INTENT: '{intent}' <<<")
 
     try:
-        if intent == "off_topic" or intent.startswith("off_topic_"):
-            print(f"[DEBUG] >>> HANDLING OFF_TOPIC <<<")
+        # 🔥 인사 처리 (최우선)
+        if intent == "greeting" or req.message.lower().strip() in ["안녕", "hi", "hello", "하이", "헬로"]:
+            print(f"[DEBUG] >>> HANDLING GREETING <<<")
+            response_text = await handle_greeting_response(req.message, tone)
+            return create_simple_stream(response_text)
+
+        # 오프토픽 처리 (nonsense 포함)
+        elif intent in ["nonsense", "off_topic", "off_topic_interesting", "off_topic_boring", "off_topic_unclear"]:
+            print(f"[DEBUG] >>> HANDLING OFF_TOPIC/NONSENSE: {intent} <<<")
             response_text = await handle_off_topic_response(req.message, tone)
             return create_simple_stream(response_text)
 
+        # 기술 문제
         elif intent == "tech_issue":
             print(f"[DEBUG] >>> HANDLING TECH_ISSUE <<<")
             response_text = await handle_tech_issue_response(req.message, tone)
             return create_simple_stream(response_text)
 
-        elif intent == "greeting":
-            print(f"[DEBUG] >>> HANDLING GREETING <<<")
-            return get_chain_by_intent("greeting", req, tone)
-
+        # 현재 사용량
         elif intent == "current_usage":
             print(f"[DEBUG] >>> HANDLING CURRENT_USAGE <<<")
-            # 현재 사용량 확인 안내
             if tone == "muneoz":
                 response_text = """현재 사용량 확인하고 싶구나! 📊
 
@@ -103,24 +124,17 @@ POST /api/usage/recommend 로 user_id 보내주면
 원하시는 서비스가 있으시면 말씀해주세요! 😊"""
             return create_simple_stream(response_text)
 
-        elif intent == "telecom_plan":
+        # 요금제 관련 - 멀티턴 시작
+        elif intent in ["telecom_plan", "telecom_plan_direct"]:
             print(f"[DEBUG] >>> HANDLING TELECOM_PLAN - STARTING MULTI-TURN <<<")
-            print(f"[DEBUG] Message: '{req.message}'")
-            print(f"[DEBUG] About to call get_multi_turn_chain with intent='phone_plan_multi'")
-            # 일반적인 요금제 문의 → 항상 멀티턴 진행
-            result = await get_multi_turn_chain(req, "phone_plan_multi", tone)
-            print(f"[DEBUG] get_multi_turn_chain returned: {type(result)}")
-            return result
+            return await get_multi_turn_chain(req, "phone_plan_multi", tone)
 
-        elif intent == "telecom_plan_direct":
-            print(f"[DEBUG] >>> HANDLING TELECOM_PLAN_DIRECT - DIRECT RECOMMENDATION <<<")
-            # 매우 구체적인 요금제 요청 → 바로 추천
-            return get_chain_by_intent("phone_plan_recommend", req, tone)
-
+        # 구독 서비스 관련 - 멀티턴 시작
         elif intent == "subscription":
             print(f"[DEBUG] >>> HANDLING SUBSCRIPTION - STARTING MULTI-TURN <<<")
             return await get_multi_turn_chain(req, "subscription_multi", tone)
 
+        # UBTI
         elif intent == "ubti":
             print(f"[DEBUG] >>> HANDLING UBTI <<<")
             if tone == "muneoz":
@@ -142,31 +156,32 @@ UBTI는 전용 API를 통해 진행됩니다:
 어떤 도움이 필요하신가요? 😊"""
             return create_simple_stream(response_text)
 
+        # 기본 케이스 - 인사나 일반적인 대화
         else:
-            print(f"[DEBUG] >>> HANDLING DEFAULT CASE <<<")
-            # 기본 응답
-            return get_chain_by_intent("default", req, tone)
+            print(f"[DEBUG] >>> HANDLING DEFAULT CASE FOR INTENT: {intent} <<<")
+            if tone == "muneoz":
+                response_text = """안뇽! 🤟 나는 무너야~ 🐙
+
+요금제나 구독 서비스 관련해서 뭐든지 물어봐!
+• 요금제 추천해줘
+• 구독 서비스 추천해줘
+
+뭘 도와줄까? 💜"""
+            else:
+                response_text = """안녕하세요! 😊 LG유플러스 상담 AI입니다.
+
+다음과 같은 서비스를 도와드릴 수 있어요:
+• 요금제 추천해주세요
+• 구독 서비스 추천해주세요
+
+어떤 도움이 필요하신가요?"""
+            return create_simple_stream(response_text)
 
     except Exception as e:
         print(f"[ERROR] Intent handling failed: {e}")
         import traceback
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
-        # 에러 발생 시 적절한 응답
         return create_simple_stream(await handle_api_error_response(tone))
-
-# 에러 응답 함수들
-async def handle_loading_error_response(tone: str = "general") -> str:
-    """로딩 실패 시 응답"""
-    if tone == "muneoz":
-        return """앗! 뭔가 삐끗했나봐! 😵
-잠깐만 기다려줘~ 금방 다시 시도해볼게!
-
-칠가이하게 기다려줘! 🐙💜"""
-    else:
-        return """죄송해요, 잠시 로딩에 문제가 발생했어요. 😔
-조금만 기다려주시면 다시 시도해보겠습니다!
-
-잠시만요~ ⏳"""
 
 async def handle_api_error_response(tone: str = "general") -> str:
     """API 오류 시 응답"""

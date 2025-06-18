@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from langchain_openai import ChatOpenAI
 
 class ConversationGuard:
-    """대화 가드레일 시스템"""
+    """대화 가드레일 시스템 - Nonsense 처리 추가"""
 
     def __init__(self):
         self.llm = ChatOpenAI(
@@ -23,7 +23,9 @@ class ConversationGuard:
 
         print(f"[DEBUG] Off-topic detailed intent: {detailed_intent}")
 
-        if detailed_intent == "off_topic_interesting":
+        if detailed_intent == "nonsense":
+            return await self._handle_nonsense_input(message, tone)
+        elif detailed_intent == "off_topic_interesting":
             return await self._handle_interesting_off_topic(message, tone)
         elif detailed_intent == "off_topic_unclear":
             return await self._handle_unclear_question(message, tone)
@@ -33,13 +35,30 @@ class ConversationGuard:
             # 기본 오프토픽 처리
             return await self._handle_general_off_topic(message, tone)
 
+    async def _handle_nonsense_input(self, message: str, tone: str) -> str:
+        """🚨 의미없는/테스트 입력 처리"""
+        if tone == "muneoz":
+            responses = [
+                "어? 뭔가 이상한 말이야! 😵‍💫\n혹시 키보드가 삐끗했어?\n\n제대로 된 질문으로 다시 말해봐~ 🤟💜",
+                "앗! 무슨 말인지 전혀 모르겠어! 🤯\n\n나는 이런 거 도와줄 수 있어:\n• 요금제 추천\n• 구독 서비스 추천\n• 데이터 사용량 확인\n• UBTI 테스트\n\n칠가이하게 제대로 된 질문 해봐! 🐙",
+                "헉! 뭔가 암호같은 말이네! 🔤❓\n\n혹시 이런 걸 물어보려던 거야?\n• \"럭키비키한 요금제 찾아줘\"\n• \"지리고 있는 구독 추천해줘\"\n• \"내 데이터 얼마나 남았어?\"\n\n알잘딱깔센하게 다시 말해줘~ ✨"
+            ]
+        else:
+            responses = [
+                "죄송해요, 입력하신 내용을 이해하지 못했어요. 😔\n\n명확한 질문으로 다시 문의해주시겠어요?\n\n예시:\n• \"월 3만원 이하 요금제 추천해주세요\"\n• \"구독 서비스 추천 부탁드려요\"\n• \"현재 데이터 사용량 확인해주세요\"",
+                "입력하신 내용이 명확하지 않네요. 🤔\n\n구체적인 질문을 해주시면 더 정확한 도움을 드릴 수 있어요!\n\n저는 다음과 같은 서비스를 제공합니다:\n• 요금제 상담 및 추천\n• 구독 서비스 추천\n• 사용량 확인 및 분석\n• 성향 기반 맞춤 상담",
+                "무엇을 문의하시는지 정확히 파악하지 못했어요. 😅\n\n좀 더 구체적으로 말씀해주시면 정확한 답변을 드리겠습니다!\n\n💡 팁: \"OO 추천해주세요\" 형태로 질문해보세요!"
+            ]
+
+        return random.choice(responses)
+
     async def _handle_interesting_off_topic(self, message: str, tone: str) -> str:
         """재미있지만 전문분야가 아닌 주제 응답"""
         if tone == "muneoz":
             responses = [
                 "오~ 완전 느좋한 주제네! 🤩\n근데 나는 그거보다 요금제가 더 재밌어! ㅋㅋㅋ\n\n럭키비키하게 요금제 얘기 해볼까? 🐙✨",
-                "헉 그것도 지리고 있는 주제인데! 😎\n하지만 내 추구미는 완전 요금제 전문가거든~\n\n칠가이하게 통신 얘기로 넘어가자! 🤟💜",
-                "와 싹싹김치! 재밌는 얘기네~ 🔥\n근데 나는 요금제 큐레이터라서 그쪽은 핑프야! 😅\n\n알잘딱깔센하게 요금제나 구독 얘기 할까? 🐙"
+                "헉 그것도 멋진 주제인데! 😎\n하지만 내 추구미는 완전 요금제 전문가거든~\n\n그냥 통신 얘기로 넘어가자! 🤟💜",
+                "와 싹싹김치! 재밌는 얘기네~ 🔥\n근데 나는 요금제 잘알이라서! 😅\n\우리 요금제나 구독 얘기 할까? 🐙"
             ]
         else:
             responses = [
@@ -54,8 +73,8 @@ class ConversationGuard:
         """일반적인 오프토픽 응답"""
         if tone == "muneoz":
             responses = [
-                "음... 그건 내가 잘 모르겠어! 😅\n나는 요금제랑 구독만 완전 지리고 있거든!\n\n뭔가 통신 관련 궁금한 거 없어? 🐙",
-                "아 그런 건 내 전문분야가 아니야~ 🤔\n대신 요금제는 퀸의 마인드로 추천해줄 수 있어!\n\n칠가이하게 요금제 얘기 해보자! 🤟",
+                "음... 그건 내가 잘 모르겠어! 😅\n나는 요금제랑 구독만 완전 잘 알고 있거든!\n\n뭔가 통신 관련 궁금한 거 없어? 🐙",
+                "아 그런 건 내 전문분야가 아니야~ 🤔\n대신 요금제나 구독은 추천해줄 수 있어!\n\n우리 요금제 얘기 해보자! 🤟",
                 "핑프같은 질문이네! 😂\n나는 LG유플러스 전문가라서 그런 건 모르겠어~\n\n헬시플레저하게 요금제 상담 받아보는 건 어때? ✨"
             ]
         else:
@@ -97,7 +116,7 @@ class ConversationGuard:
 • 데이터 사용량 체크
 • UBTI 성향 분석
 
-칠가이하게 뭔가 물어봐~ 🤟💜"""
+나한테 뭔가 물어봐~ 🤟💜"""
         else:
             return """죄송해요, 그 분야는 제가 도움드리기 어려워요. 😔
 
@@ -129,8 +148,8 @@ class ConversationGuard:
         if tone == "muneoz":
             greetings = [
                 "안뇽! 🤟 나는 무너야~ 🐙\n\n완전 럭키비키하게 만났네! ✨\n요금제랑 구독 전문가라서 완전 자신 있어!\n\n네 추구미에 딱 맞는 거 찾아줄게~ 💜",
-                "야호! 🎉 무너 등장!\n\n칠가이하게 요금제 얘기 하러 왔구나?\n알잘딱깔센하게 완전 찰떡인 거 추천해줄게! 🔥",
-                "안뇽안뇽! 🤟\n\n나는 LG유플러스 큐레이터 무너야!\n느좋한 요금제든 지리고 있는 구독이든 뭐든지 말해봐~ 🐙💜\n\n싹싹김치! 🎊"
+                "야호! 🎉 무너 등장!\n\n나랑 요금제 얘기 하러 왔구나?\n알잘딱깔센하게 완전 찰떡인 거 추천해줄게! 🔥",
+                "안뇽안뇽! 🤟\n\n나는 LG유플러스 큐레이터 무너야!\n느좋한 요금제든 구독이든 뭐든지 말해봐~ 🐙💜\n\n싹싹김치! 🎊"
             ]
         else:
             greetings = [
@@ -150,7 +169,7 @@ class ConversationGuard:
         """로딩 실패 시 응답"""
         if tone == "muneoz":
             responses = [
-                "앗! 뭔가 삐끗했나봐! 😵\n잠깐만 기다려줘~ 금방 다시 시도해볼게!\n\n칠가이하게 기다려줘! 🐙💜",
+                "앗! 뭔가 삐끗했나봐! 😵\n잠깐만 기다려줘~ 금방 다시 시도해볼게!🐙💜",
                 "어? 로딩이 좀 이상해! 🤔\n럭키비키하게 다시 해보자!\n\n조금만 참아줘~ ✨",
                 "앗차! 뭔가 꼬였나봐! 😅\n알잘딱깔센하게 다시 처리해볼게!\n\n싹싹김치! 금방 해결될 거야~ 🔥"
             ]
@@ -168,7 +187,7 @@ class ConversationGuard:
         if tone == "muneoz":
             responses = [
                 "어머 뭔가 서버가 삐끗했나봐! 😱\n내가 아니라 시스템 문제야!\n\n잠깐만 기다렸다가 다시 물어봐줘~ 🐙",
-                "아이고! 뭔가 기술적 문제가 생겼어! 🤖💥\n나는 멀쩡한데 시스템이 좀 그래!\n\n칠가이하게 조금 뒤에 다시 시도해봐! 💜",
+                "아이고! 뭔가 기술적 문제가 생겼어! 🤖💥\n나는 멀쩡한데 시스템이 좀 그래!\n\n조금 뒤에 다시 시도해봐! 💜",
                 "헉! 뭔가 서버 쪽에서 문제가 생긴 것 같아! 😵‍💫\n럭키비키하지 못한 상황이네...\n\n잠깐 뒤에 다시 말걸어줘! ✨"
             ]
         else:
