@@ -63,7 +63,7 @@ chmod +x setup.sh run.sh
 ```bash
 # 1. 프로젝트 클론
 git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
-cd 4EVER0-AI/chatbot-server
+cd chatbot-server
 
 # 2. 가상환경 생성 및 활성화
 python3 -m venv venv
