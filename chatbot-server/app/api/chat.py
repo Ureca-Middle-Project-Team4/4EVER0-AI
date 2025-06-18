@@ -170,6 +170,7 @@ async def chat(req: ChatRequest):
         yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
         await asyncio.sleep(0.05)
 
+
         # 7. 전체 응답을 단어 단위로 자연스럽게 스트리밍
         print(f"[DEBUG] Full AI response: '{full_ai_response}'")  # 디버깅용
 
@@ -181,6 +182,7 @@ async def chat(req: ChatRequest):
             }
             yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.05)
+
 
         # 8. 스트리밍 완료 신호
         yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"
