@@ -22,25 +22,31 @@ class EnhancedIntentClassifier:
 1. **greeting**: 인사, 처음 방문 (안녕, hi, hello, 하이, 헬로 등)
 2. **telecom_plan**: 요금제 관련 (바로 추천 가능)
 3. **subscription**: 구독 서비스, OTT, 음악 관련 (바로 추천 가능)
-4. **current_usage**: 현재 요금제 상태, 남은 데이터/통화량 확인
-5. **ubti**: UBTI, 타코시그널, MBTI, 성향 분석 관련
-6. **off_topic_interesting**: 재미있지만 통신과 무관한 주제 (영화, 음식, 여행 등)
-7. **off_topic_boring**: 일반적이고 통신과 무관한 주제 (날씨, 시간, 기술 등)
-8. **off_topic_unclear**: 의도를 파악하기 어려운 애매한 질문
-9. **nonsense**: 의미 없는 문자열, 랜덤 텍스트, 테스트 입력
-10. **tech_issue**: 기술적 문제, 오류 상황
-11. **multiturn_answer**: 질문에 대한 답변 (스포츠, 영화, 무제한, 3만원 등)
+4. **usage_based_recommendation**: 내 사용량 기반 추천, 현재 사용량 기반 요금제 추천
+5. **likes_based_recommendation**: 좋아요 기반 추천, 내 취향 기반 구독 추천
+6. **current_usage**: 현재 요금제 상태, 남은 데이터/통화량 확인
+7. **ubti**: UBTI, 타코시그널, MBTI, 성향 분석 관련
+8. **off_topic_interesting**: 재미있지만 통신과 무관한 주제 (영화, 음식, 여행 등)
+9. **off_topic_boring**: 일반적이고 통신과 무관한 주제 (날씨, 시간, 기술 등)
+10. **off_topic_unclear**: 의도를 파악하기 어려운 애매한 질문
+11. **nonsense**: 의미 없는 문자열, 랜덤 텍스트, 테스트 입력
+12. **tech_issue**: 기술적 문제, 오류 상황
+13. **multiturn_answer**: 질문에 대한 답변 (스포츠, 영화, 무제한, 3만원 등)
 
 📋 **🔥 중요한 구분 기준:**
 - **greeting**: 인사말이 최우선 (안녕, hi, hello, 하이, 헬로, 반가워 등)
 - **telecom_plan**: 요금제, 통신비, 데이터, 통화, 5G, LTE, 플랜 관련
 - **subscription**: 구독, OTT, 넷플릭스, 유튜브, 음악, 지니 관련
+- **usage_based_recommendation**: "내 사용량", "현재 사용량 기반", "사용 패턴 분석" 등
+- **likes_based_recommendation**: "내 취향", "좋아요 기반", "내가 좋아하는", "선호도" 등
 - **multiturn_answer**: 질문에 대한 간단한 답변
 
 📋 **예시:**
 - "안녕", "하이", "hello" → greeting (최우선)
 - "요금제 추천해줘" → telecom_plan
 - "구독 서비스 추천" → subscription
+- "내 사용량 기반으로 추천해줘" → usage_based_recommendation
+- "내 취향에 맞는 구독 추천해줘" → likes_based_recommendation
 - "스포츠를 좋아해" → multiturn_answer
 
 사용자 메시지: "{message}"
@@ -175,9 +181,27 @@ class EnhancedIntentClassifier:
         if any(k in lowered for k in subscription_keywords):
             return "subscription"
 
-        # 현재 사용량 관련
-        usage_keywords = ["남은", "현재", "사용량", "얼마나 썼", "잔여", "상태", "확인", "체크"]
-        if any(k in lowered for k in usage_keywords):
+        # 🔥 사용량 기반 추천 관련
+        usage_keywords = ["사용량", "사용 패턴", "내 사용량", "현재 사용량", "데이터 사용량", "통화 사용량"]
+        usage_phrases = ["사용량 기반", "내 사용량으로", "현재 사용량 기반으로", "사용 패턴 분석"]
+
+        if any(phrase in lowered for phrase in usage_phrases):
+            return "usage_based_recommendation"
+        if any(k in lowered for k in usage_keywords) and any(rec in lowered for rec in ["추천", "분석"]):
+            return "usage_based_recommendation"
+
+        # 🔥 좋아요/취향 기반 추천 관련
+        likes_keywords = ["좋아요", "취향", "선호", "내가 좋아하는", "마음에 드는", "선호도"]
+        likes_phrases = ["좋아요 기반", "내 취향", "취향에 맞는", "선호도 기반"]
+
+        if any(phrase in lowered for phrase in likes_phrases):
+            return "likes_based_recommendation"
+        if any(k in lowered for k in likes_keywords) and any(rec in lowered for rec in ["추천", "서비스", "구독"]):
+            return "likes_based_recommendation"
+
+        # 현재 사용량 관련 (단순 조회)
+        current_usage_keywords = ["남은", "현재", "잔여", "상태", "확인", "체크"]
+        if any(k in lowered for k in current_usage_keywords):
             return "current_usage"
 
         # UBTI 관련

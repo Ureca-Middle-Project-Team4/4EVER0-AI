@@ -62,33 +62,131 @@ def _safe_price_value(price) -> int:
         return 0
 
 def _generate_simple_explanation(usage, recommendation_type: str, recommended_plans: list, tone: str) -> str:
-    """간단한 설명 생성"""
+    """간단한 설명 생성 - 더 자세하고 유용하게"""
 
     usage_pct = usage.usage_percentage
     current_plan = usage.current_plan_name
+    data_gb = usage.remaining_data / 1000
 
     if tone == "muneoz":
         if recommendation_type == "urgent_upgrade":
-            return f"헉! 사용률이 {usage_pct:.1f}%나 돼서 완전 위험해! 🚨\n지금 당장 상위 요금제로 바꿔야 할 것 같아~ 위에 추천한 요금제들 중에 하나 골라봐! 🔥"
+            return f"""헉! 사용률이 {usage_pct:.1f}%나 돼서 완전 위험해! 🚨
+
+현재 {current_plan} 쓰고 있는데 데이터가 {data_gb:.1f}GB밖에 안 남았어!
+이대로 가면 속도 제한 걸릴 거야~ 😱
+
+지금 당장 상위 요금제로 바꿔야 할 것 같아!
+위에 추천한 요금제들 중에 하나 골라봐! 🔥
+
+데이터 더 많이 주는 걸로 바꾸면 완전 럭키비키할 거야! ✨"""
+
         elif recommendation_type == "upgrade":
-            return f"사용률이 {usage_pct:.1f}%라서 좀 넉넉한 요금제가 좋을 것 같아! 💪\n위에 추천한 요금제들이 네 패턴에 완전 찰떡일 거야~ ✨"
+            return f"""사용률이 {usage_pct:.1f}%라서 좀 넉넉한 요금제가 좋을 것 같아! 💪
+
+현재 {current_plan}인데 {data_gb:.1f}GB 남았네~
+아직 괜찮긴 한데 여유가 별로 없어 보여!
+
+위에 추천한 요금제들이 네 패턴에 완전 찰떡일 거야! ✨
+데이터 걱정 없이 마음껏 쓸 수 있어~
+
+어때? 업그레이드 해볼까? 🤟"""
+
         elif recommendation_type == "maintain":
-            return f"현재 {current_plan} 사용률이 {usage_pct:.1f}%로 딱 적당해! 😊\n비슷한 가격대 요금제들 추천해봤으니 참고해봐~ 🤟"
+            return f"""현재 {current_plan} 사용률이 {usage_pct:.1f}%로 딱 적당해! 😊
+
+{data_gb:.1f}GB 남아있고 사용 패턴도 안정적이야!
+굳이 바꿀 필요는 없지만 비슷한 가격대 요금제들도 있어~
+
+위에 추천한 거 보고 혹시 더 마음에 드는 게 있나 확인해봐! 🤟
+가성비나 혜택이 더 좋을 수도 있거든! 💜"""
+
         elif recommendation_type == "downgrade":
-            return f"사용률이 {usage_pct:.1f}%밖에 안 돼서 돈 아까워! 💸\n더 저렴한 요금제로 바꿔서 헬시플레저하게 써봐~ 싹싹김치! ✨"
-        else:
-            return f"사용률 {usage_pct:.1f}%보니까 이런 요금제들이 느좋할 것 같아! 🎯\n위에 추천한 거 중에 마음에 드는 거 있어? 💜"
-    else:
+            return f"""사용률이 {usage_pct:.1f}%밖에 안 돼서 돈 아까워! 💸
+
+{data_gb:.1f}GB나 남았는데 이건 완전 오버스펙이야!
+더 저렴한 요금제로 바꿔서 헬시플레저하게 써봐~
+
+위에 추천한 요금제들로 바꾸면 월 1만원 이상 아낄 수 있어!
+그 돈으로 맛있는 거 먹거나 다른 구독 서비스 쓰는 게 어때? 싹싹김치! ✨"""
+
+        else:  # alternative or cost_optimize
+            return f"""사용률 {usage_pct:.1f}%보니까 이런 요금제들이 느좋할 것 같아! 🎯
+
+현재 {current_plan}에서 {data_gb:.1f}GB 남았는데,
+네 사용 패턴 분석해보니까 딱 적당한 수준이야!
+
+위에 추천한 요금제들 중에서 골라봐:
+• 비슷한 가격대지만 혜택이 더 좋은 거
+• 아니면 조금 더 저렴하면서도 충분한 거
+
+어떤 게 마음에 들어? 💜"""
+
+    else:  # general tone
         if recommendation_type == "urgent_upgrade":
-            return f"현재 사용률이 {usage_pct:.1f}%로 매우 높습니다. 🚨\n데이터 부족을 방지하기 위해 상위 요금제로 변경을 권장드립니다."
+            return f"""⚠️ 긴급 업그레이드 권장
+
+현재 사용률이 {usage_pct:.1f}%로 매우 높습니다!
+{current_plan} 요금제에서 데이터가 {data_gb:.1f}GB만 남아있어 곧 속도 제한에 걸릴 수 있습니다.
+
+📋 권장사항:
+• 즉시 상위 요금제로 변경하여 데이터 부족 방지
+• 데이터 용량이 더 큰 요금제 선택 권장
+• 월말까지 안전하게 사용할 수 있는 여유 확보
+
+위 추천 요금제들을 검토해보시고 빠른 변경을 고려해주세요."""
+
         elif recommendation_type == "upgrade":
-            return f"사용률 {usage_pct:.1f}%로 약간 여유가 필요해 보입니다. 📈\n위 추천 요금제들이 고객님의 사용 패턴에 적합할 것 같습니다."
+            return f"""📈 업그레이드 권장
+
+사용률 {usage_pct:.1f}%로 약간의 여유가 필요해 보입니다.
+현재 {current_plan}에서 {data_gb:.1f}GB 남아있지만, 안정적인 사용을 위해 상위 요금제를 권장드립니다.
+
+💡 업그레이드 시 장점:
+• 데이터 걱정 없이 자유로운 인터넷 사용
+• 속도 제한 위험 제거
+• 여유로운 월말 사용 가능
+
+위 추천 요금제들이 고객님의 사용 패턴에 적합할 것 같습니다."""
+
         elif recommendation_type == "maintain":
-            return f"현재 {current_plan} 요금제의 사용률이 {usage_pct:.1f}%로 적절합니다. ✅\n비슷한 수준의 요금제들을 추천드립니다."
+            return f"""✅ 현재 요금제 적정 수준
+
+{current_plan} 요금제의 사용률이 {usage_pct:.1f}%로 적절합니다.
+{data_gb:.1f}GB가 남아있어 월말까지 무리 없이 사용 가능합니다.
+
+📊 현재 상태:
+• 사용 패턴이 요금제와 잘 맞음
+• 데이터 여유분 충분
+• 비용 대비 효율적 사용
+
+굳이 변경하지 않으셔도 되지만, 비슷한 가격대의 다른 옵션들도 참고해보세요."""
+
         elif recommendation_type == "downgrade":
-            return f"사용률이 {usage_pct:.1f}%로 낮아 비용 절약이 가능합니다. 💰\n더 경제적인 요금제들을 추천드립니다."
-        else:
-            return f"사용률 {usage_pct:.1f}%를 고려한 맞춤 요금제들입니다. 🎯\n고객님의 사용 패턴에 적합한 옵션들을 확인해보세요."
+            return f"""💰 비용 절약 기회
+
+사용률이 {usage_pct:.1f}%로 낮아 비용 절약이 가능합니다!
+현재 {data_gb:.1f}GB나 남아있어 현재 요금제가 과도할 수 있습니다.
+
+💸 절약 효과:
+• 월 통신비 1만원 이상 절약 가능
+• 불필요한 데이터 용량 제거
+• 절약한 비용으로 다른 서비스 이용 가능
+
+위 추천 요금제들로 변경하시면 더 경제적으로 이용하실 수 있습니다."""
+
+        else:  # alternative or cost_optimize
+            return f"""🎯 맞춤 요금제 추천
+
+사용률 {usage_pct:.1f}%를 종합 분석한 결과입니다.
+현재 {current_plan}에서 {data_gb:.1f}GB 남은 상태로 적정 수준입니다.
+
+📋 추천 근거:
+• 현재 사용 패턴 분석 완료
+• 데이터/통화/문자 사용량 고려
+• 가성비 최적화 옵션 선별
+
+위 요금제들은 고객님의 사용 습관과 예산에 맞춰 선별된 옵션들입니다.
+각 요금제의 상세 혜택을 비교해보시고 선택하세요."""
 
 @router.post("/usage/recommend")
 async def usage_based_recommendation(
