@@ -105,7 +105,7 @@ async def next_question(req: UBTIRequest):
 
 @router.post("/ubti/result")
 async def final_result(req: UBTIRequest):
-    """UBTI 최종 결과를 JSON으로 반환 (스트리밍 X)"""
+    """UBTI 최종 결과를 JSON으로 반환 (스트리밍 X) - ID 포함"""
     session_id = f"ubti_session:{req.session_id}"
     session = get_session(session_id)
 
@@ -121,14 +121,19 @@ async def final_result(req: UBTIRequest):
     plans = get_all_plans()
     subscriptions = get_products_from_db()
 
+    # 🔥 ID 포함하여 포맷팅
     subs_text = "\n".join([
-        f"- {s.title}: {s.category}" for s in subscriptions
+        f"- ID: {s.id}, {s.title}: {s.category} - {s.price}원" for s in subscriptions
+    ])
+
+    plans_text = "\n".join([
+        f"- ID: {p.id}, {p.name}: {p.price}원 / {p.data} / {p.voice}" for p in plans
     ])
 
     prompt = get_ubti_prompt().format(
         message="\n".join(session["answers"]),
         ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),
-        plans="\n".join(p.name for p in plans),
+        plans=plans_text,
         subscriptions=subs_text
     )
 
@@ -148,7 +153,10 @@ async def final_result(req: UBTIRequest):
         parsed_result = json.loads(json_text)
         print(f"[DEBUG] Parsed result: {parsed_result}")
 
-        # 4. UBTIResult 스키마에 맞게 데이터 구성
+        # 4. ID 검증
+        validate_ubti_response_ids(parsed_result, plans, subscriptions)
+
+        # 5. UBTIResult 스키마에 맞게 데이터 구성
         result_data = UBTIResult(**parsed_result)
 
         return JSONResponse(
@@ -165,6 +173,47 @@ async def final_result(req: UBTIRequest):
         print(f"[ERROR] 추출된 텍스트: '{json_text if 'json_text' in locals() else 'N/A'}'")
         raise HTTPException(status_code=500, detail="GPT 응답 파싱에 실패했습니다.")
 
+    except ValueError as e:
+        print(f"[ERROR] ID 검증 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"응답 검증 실패: {str(e)}")
+
     except Exception as e:
         print(f"[ERROR] 결과 처리 실패: {e}")
         raise HTTPException(status_code=500, detail="결과 처리 중 오류가 발생했습니다.")
+
+def validate_ubti_response_ids(parsed_result: dict, plans: list, subscriptions: list):
+    """UBTI 응답의 ID 유효성 검증"""
+
+    # 유효한 ID 목록 생성
+    valid_plan_ids = {p.id for p in plans}
+    valid_subscription_ids = {s.id for s in subscriptions}
+
+    # plans 검증 (2개여야 함)
+    if "recommendation" not in parsed_result:
+        raise ValueError("recommendation 필드가 없습니다")
+
+    if "plans" not in parsed_result["recommendation"]:
+        raise ValueError("plans 필드가 없습니다")
+
+    plans_data = parsed_result["recommendation"]["plans"]
+    if not isinstance(plans_data, list) or len(plans_data) != 2:
+        raise ValueError("plans는 정확히 2개의 항목이 있어야 합니다")
+
+    # 각 plan의 ID 검증
+    for i, plan in enumerate(plans_data):
+        if "id" not in plan:
+            raise ValueError(f"plans[{i}]에 id가 없습니다")
+        if plan["id"] not in valid_plan_ids:
+            raise ValueError(f"plans[{i}]의 id {plan['id']}가 유효하지 않습니다")
+
+    # subscription 검증
+    if "subscription" not in parsed_result["recommendation"]:
+        raise ValueError("subscription 필드가 없습니다")
+
+    subscription_data = parsed_result["recommendation"]["subscription"]
+    if "id" not in subscription_data:
+        raise ValueError("subscription에 id가 없습니다")
+    if subscription_data["id"] not in valid_subscription_ids:
+        raise ValueError(f"subscription의 id {subscription_data['id']}가 유효하지 않습니다")
+
+    print(f"[DEBUG] ID 검증 완료 - Plans: {[p['id'] for p in plans_data]}, Subscription: {subscription_data['id']}")

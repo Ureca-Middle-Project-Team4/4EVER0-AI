@@ -13,6 +13,7 @@ def get_intent_classifier():
         intent_classifier = EnhancedIntentClassifier()
     return intent_classifier
 
+
 def get_conversation_guard():
     """대화 가드 싱글톤 인스턴스 (기존 함수명 유지)"""
     global conversation_guard
