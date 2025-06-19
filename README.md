@@ -19,8 +19,8 @@ setup.bat
 run.bat
 ```
 
-### **macOS/Linux 사용자**
-```bash
+###  macOS/Linux 사용자
+```cmd
 git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
 cd 4EVER0-AI
 chmod +x setup.sh run.sh
@@ -32,22 +32,24 @@ chmod +x setup.sh run.sh
 ```bash
 # 1. 프로젝트 클론
 git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
-cd chatbot-server
+cd 4EVER0-AI
 
 # 2. 가상환경 생성 및 활성화
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 3. 패키지 설치
-pip install -r requirements.txt
-# 윈도우: pip install -r requirements-windows.txt
+pip install -r chatbot-server/requirements.txt
+# Windows: pip install -r chatbot-server/requirements-windows.txt
 
-# 4. .env 설정 (OPENAI_API_KEY 필수)
+# 4. .env 설정 
+# chatbot-server/.env 생성 및 환경변수 설정
 
-# 5. Redis 시작
-redis-server
+# 5. Redis 시작 (Linux/macOS만)
+redis-server --daemonize yes
 
 # 6. 서버 실행
+cd chatbot-server
 python run.py
 # 또는
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
