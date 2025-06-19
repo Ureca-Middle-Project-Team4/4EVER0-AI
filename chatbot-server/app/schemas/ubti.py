@@ -2,12 +2,13 @@ from pydantic import BaseModel
 from typing import Optional, Union, Dict, List
 
 class PlanOrSubscription(BaseModel):
+    id: int  # 🔥 ID 추가
     name: str
     description: str
 
 class Recommendation(BaseModel):
-    plans: List[PlanOrSubscription]  # 단일 plan -> plans 리스트로 변경
-    subscription: PlanOrSubscription
+    plans: List[PlanOrSubscription]  # 요금제 2개 각각 ID 포함
+    subscription: PlanOrSubscription  # 구독 서비스 ID 포함
 
 class MatchingType(BaseModel):
     code: str

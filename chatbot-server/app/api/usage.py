@@ -1,19 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
-from app.schemas.chat import ChatRequest
-from app.services.handle_usage import handle_usage_recommendation
-from app.db.plan_db import get_all_plans
-from app.db.subscription_db import get_products_from_db
-from app.prompts.usage_prompt import get_usage_prompt
-from app.utils.langchain_client import get_chat_model
-from typing import Optional
+from fastapi.responses import StreamingResponse
+from app.schemas.usage import CurrentUsageRequest
+from app.chains.usage_chain import get_usage_based_recommendation_chain
+from app.db.user_usage_db import get_user_current_usage
+import json
 import asyncio
 
 router = APIRouter()
-
-class UsageRecommendationRequest:
-    def __init__(self, user_id: int, tone: str = "general"):
-        self.user_id = user_id
-        self.tone = tone
 
 @router.post("/usage/recommend")
 async def usage_based_recommendation(
@@ -21,50 +14,95 @@ async def usage_based_recommendation(
     tone: str = Query("general", description="응답 톤 (general/muneoz)")
 ):
     """
-    사용자 사용량 기반 추천
+    사용자 사용량 기반 요금제 추천 - 스트리밍 지원
     """
-    try:
-        print(f"[DEBUG] Usage recommendation request - user_id: {user_id}, tone: {tone}")
+    async def generate_stream():
+        try:
+            print(f"[DEBUG] Usage recommendation request - user_id: {user_id}, tone: {tone}")
 
-        # 요금제와 구독 서비스 데이터 조회
-        plans = get_all_plans()
-        subscriptions = get_products_from_db()
+            # 1. 사용자 정보 존재 여부 확인
+            user_usage = get_user_current_usage(user_id)
+            if not user_usage:
+                error_data = {
+                    "type": "error",
+                    "message": "사용자 정보를 찾을 수 없습니다." if tone == "general" else "앗! 사용자 정보를 찾을 수 없어! 😅"
+                }
+                yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+                return
 
-        # 사용량 기반 추천 로직
-        recommendations = await generate_usage_recommendations(user_id, plans, subscriptions, tone)
+            # 2. 사용량 분석 결과 먼저 전송
+            usage_summary = {
+                "type": "usage_analysis",
+                "data": {
+                    "user_id": user_id,
+                    "current_plan": user_usage.current_plan_name,
+                    "current_price": user_usage.current_plan_price,
+                    "remaining_data": user_usage.remaining_data,
+                    "remaining_voice": user_usage.remaining_voice,
+                    "remaining_sms": user_usage.remaining_sms,
+                    "usage_percentage": round(user_usage.usage_percentage, 1)
+                }
+            }
+            yield f"data: {json.dumps(usage_summary, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.1)
 
-        return {
-            "success": True,
-            "message": "사용량 기반 추천이 완료되었습니다.",
-            "data": recommendations
-        }
+            # 3. 스트리밍 시작 신호
+            yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.05)
 
-    except Exception as e:
-        print(f"[ERROR] Usage recommendation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"추천 생성 실패: {str(e)}")
+            # 4. 사용량 기반 추천 체인 실행
+            req = CurrentUsageRequest(user_id=user_id, tone=tone)
+            stream_fn = await get_usage_based_recommendation_chain(req)
+
+            # 5. AI 추천 스트리밍
+            async for chunk in stream_fn():
+                if chunk.strip():
+                    chunk_data = {
+                        "type": "message_chunk",
+                        "content": chunk
+                    }
+                    yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0.05)
+
+            # 6. 스트리밍 완료 신호
+            yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            print(f"[ERROR] Usage recommendation failed: {e}")
+            error_data = {
+                "type": "error",
+                "message": f"추천 생성 실패: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(generate_stream(), media_type="text/event-stream")
 
 @router.get("/usage/{user_id}")
 async def get_user_usage(user_id: int):
     """
-    사용자 사용량 조회
+    사용자 사용량 조회 - 실제 DB 연동
     """
     try:
-        # 실제 사용량 데이터는 없으므로 모의 데이터 반환
+        # 실제 DB에서 사용량 데이터 조회
+        user_usage = get_user_current_usage(user_id)
+
+        if not user_usage:
+            raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다.")
+
+        # 응답 데이터 구성
         usage_data = {
-            "user_id": user_id,
-            "data_usage": "7.2GB",
-            "voice_usage": "180분",
-            "sms_usage": "45건",
-            "monthly_average": {
-                "data": "6.8GB",
-                "voice": "150분",
-                "sms": "52건"
+            "user_id": user_usage.user_id,
+            "current_plan": {
+                "name": user_usage.current_plan_name,
+                "price": user_usage.current_plan_price
             },
-            "usage_pattern": {
-                "peak_hours": ["19:00-22:00", "07:00-09:00"],
-                "most_used_services": ["YouTube", "Instagram", "카카오톡"],
-                "data_trend": "증가"
-            }
+            "remaining": {
+                "data": f"{user_usage.remaining_data}MB",
+                "voice": f"{user_usage.remaining_voice}분",
+                "sms": f"{user_usage.remaining_sms}건"
+            },
+            "usage_percentage": user_usage.usage_percentage,
+            "status": _get_usage_status(user_usage.usage_percentage)
         }
 
         return {
@@ -73,94 +111,41 @@ async def get_user_usage(user_id: int):
             "data": usage_data
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[ERROR] Usage data retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=f"사용량 조회 실패: {str(e)}")
 
-async def generate_usage_recommendations(user_id: int, plans: list, subscriptions: list, tone: str = "general"):
-    """
-    사용량 기반 추천 생성
-    """
-    try:
-        # 모의 사용량 데이터 생성 (실제로는 DB에서 조회)
-        usage_data = {
-            "data_usage": 7.2,  # GB
-            "voice_usage": 180,  # 분
-            "sms_usage": 45,     # 건
-            "services": ["YouTube", "Instagram", "카카오톡"],
-            "peak_time": "저녁시간",
-            "trend": "데이터 사용량 증가"
-        }
-
-        # 요금제 데이터 포맷팅 (오류 방지를 위해 안전하게 처리)
-        plans_text = "\n".join([
-            f"- {p.name} / {format_price_safely(p.price)} / {p.data or '-'} / {p.voice or '-'}"
-            for p in plans
-        ])
-
-        # 구독 서비스 데이터 포맷팅
-        subs_text = "\n".join([
-            f"- {s.title} ({s.category}) - {format_price_safely(s.price)}"
-            for s in subscriptions
-        ])
-
-        # 사용량 정보 텍스트화
-        usage_text = f"""
-- 데이터 사용량: {usage_data['data_usage']}GB (월평균)
-- 음성통화: {usage_data['voice_usage']}분
-- 문자: {usage_data['sms_usage']}건
-- 주요 사용 서비스: {', '.join(usage_data['services'])}
-- 주 사용 시간대: {usage_data['peak_time']}
-- 사용 패턴: {usage_data['trend']}
-"""
-
-        # 프롬프트 생성
-        prompt = get_usage_prompt(tone).format(
-            usage_info=usage_text,
-            plans=plans_text,
-            subscriptions=subs_text
-        )
-
-        # AI 모델 호출
-        model = get_chat_model()
-        response = await model.ainvoke(prompt)
-
+def _get_usage_status(usage_percentage: float) -> dict:
+    """사용률에 따른 상태 정보"""
+    if usage_percentage >= 95:
         return {
-            "user_id": user_id,
-            "usage_analysis": usage_data,
-            "recommendation": response.content,
-            "tone": tone
+            "level": "critical",
+            "message": "사용량이 거의 소진되었습니다",
+            "recommendation": "요금제 업그레이드를 권장합니다"
         }
-
-    except Exception as e:
-        print(f"[ERROR] Recommendation generation failed: {e}")
-        raise e
-
-def format_price_safely(price):
-    """
-    가격을 안전하게 포맷팅하는 함수
-    문자열/숫자 타입 모두 처리 가능
-    """
-    try:
-        # 이미 문자열이고 '원'이 포함된 경우
-        if isinstance(price, str):
-            if '원' in price:
-                return price
-            # 숫자 문자열인 경우 정수로 변환 후 포맷팅
-            try:
-                price_num = int(price.replace(',', '').replace('원', ''))
-                return f"{price_num:,}원"
-            except ValueError:
-                return price
-        
-        # 숫자인 경우
-        elif isinstance(price, (int, float)):
-            return f"{int(price):,}원"
-        
-        # 기타 경우
-        else:
-            return str(price)
-            
-    except Exception as e:
-        print(f"[WARNING] Price formatting failed for {price}: {e}")
-        return str(price)
+    elif usage_percentage >= 80:
+        return {
+            "level": "warning",
+            "message": "사용량이 많습니다",
+            "recommendation": "사용량을 확인하시거나 상위 요금제를 고려해보세요"
+        }
+    elif usage_percentage >= 50:
+        return {
+            "level": "normal",
+            "message": "적절한 사용량입니다",
+            "recommendation": "현재 요금제가 적합합니다"
+        }
+    elif usage_percentage <= 20:
+        return {
+            "level": "low",
+            "message": "사용량이 적습니다",
+            "recommendation": "더 저렴한 요금제를 고려해보세요"
+        }
+    else:
+        return {
+            "level": "normal",
+            "message": "안정적인 사용량입니다",
+            "recommendation": "현재 요금제를 유지하시면 됩니다"
+        }

@@ -10,8 +10,8 @@ def get_ubti_prompt(tone: str = "general"):
 
 니가 한 답변 바탕으로 아래 항목들을 꼭 포함해서 추천해줄게:
 - 너랑 찰떡인 UBTI 타입 2개!
-- 추천 요금제(plan) 하나!
-- 추천 구독 서비스(subscription) 하나!
+- 추천 요금제(plan) 2개! (각각 ID 포함)
+- 추천 구독 서비스(subscription) 하나! (ID 포함)
 - 성향이 잘 맞는 matching_type 한 명!
 - 그리고 한 줄로 요약(summary)!
 
@@ -22,13 +22,15 @@ def get_ubti_prompt(tone: str = "general"):
 UBTI 타입 목록:
 {ubti_types}
 
-요금제 목록:
+요금제 목록 (ID 포함):
 {plans}
 
-구독 서비스 목록:
+구독 서비스 목록 (ID 포함):
 {subscriptions}
 
 📦 응답은 **아래 JSON 예시와 동일한 형식**으로, **다른 말은 일절 없이** 딱 JSON만 출력해줘!
+
+🚨 중요: plans는 2개, subscription은 1개, 모든 항목에 id 필드가 반드시 포함되어야 해!
 
 예시 형식:
 {{
@@ -42,15 +44,18 @@ UBTI 타입 목록:
   "recommendation": {{
    "plans":[
          {{
+           "id": 5,
            "name": "너겟 34",
            "description": "데이터 걱정 없이 쓰면서도 통신비는 합리적으로!\\n\\n실속 챙기는 분께 딱이에요 👍"
          }},
          {{
+           "id": 3,
            "name": "라이트 23",
            "description": "기본기는 탄탄하면서 가성비까지!\\n\\n심플하게 쓰시는 분들께 추천드려요 💡"
          }}
         ],
     "subscription": {{
+      "id": 4,
       "name": "U+모바일tv",
       "description": "친구랑 콘텐츠 공유하면서 더 가까워지는 시간! 보기만 해도 TMI 넘치는 찰떡 서비스랍니다 🎬"
     }}
@@ -68,7 +73,7 @@ UBTI 타입 목록:
 아래 사용자 답변을 바탕으로 다음 항목을 포함한 결과를 작성하세요:
 - ubti_type
 - summary
-- recommendation (plan + subscription)
+- recommendation (plans 2개 + subscription 1개, 모두 ID 포함)
 - matching_type
 
 📨 사용자 답변:
@@ -78,13 +83,15 @@ UBTI 타입 목록:
 UBTI 타입 목록:
 {ubti_types}
 
-요금제 목록:
+요금제 목록 (ID 포함):
 {plans}
 
-구독 서비스 목록:
+구독 서비스 목록 (ID 포함):
 {subscriptions}
 
 📦 응답은 다음 JSON 형식과 **동일한 구조**로 작성하고, **추가 설명 없이 JSON만 출력하세요**:
+
+🚨 중요: plans는 반드시 2개, subscription은 1개, 모든 항목에 id 필드가 포함되어야 합니다!
 
 {{
   "ubti_type": {{
@@ -97,15 +104,18 @@ UBTI 타입 목록:
   "recommendation": {{
      "plans":[
              {{
+               "id": 5,
                "name": "너겟 34",
                "description": "데이터 걱정 없이 쓰면서도 통신비는 합리적으로!\\n\\n실속 챙기는 분께 딱이에요 👍"
              }},
              {{
+               "id": 3,
                "name": "라이트 23",
                "description": "기본기는 탄탄하면서 가성비까지!\\n\\n심플하게 쓰시는 분들께 추천드려요 💡"
              }}
             ],
     "subscription": {{
+      "id": 4,
       "name": "U+모바일tv",
       "description": "친구랑 콘텐츠 공유하면서 더 가까워지는 시간! 보기만 해도 TMI 넘치는 찰떡 서비스랍니다 🎬"
     }}
