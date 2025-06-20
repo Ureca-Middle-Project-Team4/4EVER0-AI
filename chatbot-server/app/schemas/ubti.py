@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, Union, Dict, List
 
 class PlanOrSubscription(BaseModel):
-    id: int  # 🔥 ID 추가
+    id: int
     name: str
     description: str
 
@@ -11,16 +11,20 @@ class Recommendation(BaseModel):
     subscription: PlanOrSubscription  # 구독 서비스 ID 포함
 
 class MatchingType(BaseModel):
+    id: int
     code: str
     name: str
     emoji: str
     reason: str
+    image_url: str
 
 class UBTIType(BaseModel):
+    id: int
     code: str
     name: str
     emoji: str
     description: str
+    image_url: str
 
 class UBTIRequest(BaseModel):
     session_id: str

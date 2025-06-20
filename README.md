@@ -32,7 +32,7 @@ chmod +x setup.sh run.sh
 ```bash
 # 1. 프로젝트 클론
 git clone https://github.com/Ureca-Middle-Project-Team4/4EVER0-AI
-cd 4EVER0-AI
+cd chatbot-server
 
 # 2. 가상환경 생성 및 활성화
 python3 -m venv venv
@@ -109,32 +109,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 **📄 API 문서:**
 - [Swagger Docs](http://localhost:8000/docs)
 - [ReDoc Docs](http://localhost:8000/redoc)
-
-## 📁 폴더 구조
-
-```
-chatbot-server/
-app/
-├── api/              # FastAPI 라우터
-│   ├── chat.py       # 🔥 메인 채팅 (통합 세션 관리)
-│   ├── ubti.py       # UBTI 분석
-│   └── usage.py      # 사용량 추천
-├── prompts/          # AI 프롬프트 템플릿
-│   ├── base_prompt.py
-│   ├── plan_prompt.py
-│   ├── subscription_prompt.py
-│   ├── ubti_prompt.py
-│   └── usage_prompt.py
-├── utils/            # 🧠 핵심 유틸리티
-│   ├── intent_classifier.py     # 🔥 강화된 AI 인텐트 분류
-│   ├── conversation_guard.py    # 🔥 Nonsense 처리 포함 가드레일
-│   ├── intent.py               # 통합 인텐트 처리
-│   └── redis_client.py         # 🔥 세션 키 통일 관리
-├── chains/           # LangChain 체인
-│   └── chat_chain.py # 🔥 멀티턴 플로우 개선
-├── db/               # 데이터베이스
-└── schemas/          # Pydantic 스키마
-```
 
 ## Conversational System Architecture
 ```mermaid
