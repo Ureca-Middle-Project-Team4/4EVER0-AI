@@ -35,6 +35,7 @@ UBTI 타입 목록:
 예시 형식:
 {{
   "ubti_type": {{
+    "id": 6,
     "code": "TK-Spicy",
     "name": "액티브한 매콤타코",
     "emoji": "🌶",
@@ -61,6 +62,7 @@ UBTI 타입 목록:
     }}
   }},
   "matching_type": {{
+    "id": 7,
     "code": "TK-SweetChoco",
     "name": "말 많은 수다타코",
     "emoji": "🍫",
@@ -95,10 +97,12 @@ UBTI 타입 목록:
 
 {{
   "ubti_type": {{
+    "id": 6,
     "code": "TK-Spicy",
     "name": "액티브한 매콤타코",
     "emoji": "🌶",
     "description": "어디서든 분위기 메이커인 에너자이저 타입이에요. 활발하게 소통하는 걸 좋아하고, 데이터도 빵빵하게 쓰는 걸 선호해요."
+    "image_url": "https://example.com/images/spicy.png"
   }},
   "summary": "🍽 오늘의 추천 타코야키 한 접시 나왔습니다!\\n\\n회원님은 소통을 즐기고 실용적인 선택을 중요하게 생각하시는 분이에요. 덕분에 활기차고 매콤한 TK-Spicy 타입이랑 정말 잘 어울리시더라고요!\\n\\n매일매일 연결되는 대화와 데이터 사용이 일상이신 분에게 꼭 맞는 스타일이에요.",
   "recommendation": {{
@@ -121,9 +125,11 @@ UBTI 타입 목록:
     }}
   }},
   "matching_type": {{
+    "id": 7,
     "code": "TK-SweetChoco",
     "name": "말 많은 수다타코",
     "emoji": "🍫",
     "description": "감정 나누는 걸 소중하게 여기는 따뜻한 커뮤니케이터 타입이에요. 톡도 통화도 자주 하는 분들이 많답니다!"
+    "image_url": "https://example.com/images/sweet.png"
   }}
 }}"""
