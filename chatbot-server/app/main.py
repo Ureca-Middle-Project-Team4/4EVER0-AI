@@ -37,11 +37,11 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(chat_router, prefix="/api/chat", tags=["채팅"])
-app.include_router(usage_router, prefix="/api/chat/usage", tags=["사용량 기반 추천"])
-app.include_router(chat_like_router, prefix="/api/chat/likes", tags=["좋아요 기반 추천"])
-app.include_router(ubti_router, prefix="/api/ubti", tags=["UBTI 분석"])
-app.include_router(user_router, prefix="/api/users", tags=["사용자 관리"])
+app.include_router(chat_router, prefix="/api", tags=["채팅"])
+app.include_router(usage_router, prefix="/api/chat", tags=["사용량 기반 추천"])
+app.include_router(chat_like_router, prefix="/likes", tags=["좋아요 기반 추천"])
+app.include_router(ubti_router, prefix="/api", tags=["UBTI 분석"])
+app.include_router(user_router, prefix="/api", tags=["사용자 관리"])
 
 @app.get("/", tags=["기본정보"])
 async def root():
