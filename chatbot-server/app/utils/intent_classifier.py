@@ -1,3 +1,4 @@
+# app/utils/intent_classifier.py - 가격 인식 강화
 import os
 import re
 from typing import Dict, Any
@@ -23,7 +24,7 @@ class EnhancedIntentClassifier:
 2. **telecom_plan**: 요금제 관련 질문 및 추천 요청
 3. **subscription**: 구독 서비스, OTT, 음악 관련 질문 및 추천 요청
 4. **current_usage**: 현재 요금제 상태, 남은 데이터/통화량 확인
-# 5. **ubti**: UBTI, 성향 분석 관련
+5. **ubti**: UBTI, 성향 분석 관련
 6. **off_topic_interesting**: 재미있지만 통신과 무관한 주제 (영화, 음식, 여행 등)
 7. **off_topic_boring**: 일반적이고 통신과 무관한 주제 (날씨, 시간, 기술 등)
 8. **off_topic_unclear**: 의도를 파악하기 어려운 애매한 질문
@@ -37,9 +38,14 @@ class EnhancedIntentClassifier:
 - **subscription**: 구독, OTT, 넷플릭스, 유튜브, 음악, 지니, 스포티파이, 웨이브 관련
 - **multiturn_answer**: 짧고 간단한 답변 형태 (10자 이하, 단답형)
 
+📋 **가격 관련 특별 처리**:
+- "5만원", "7만원", "십만원", "오만원" 등 → telecom_plan
+- "3만원대", "5만원 이하", "7만원 정도" 등 → telecom_plan
+- 가격과 함께 언급된 모든 표현 → telecom_plan
+
 📋 **예시:**
 - "안녕", "하이", "hello", "반가워" → greeting (최우선)
-- "요금제 추천해줘", "5만원 이하 플랜", "데이터 많은 거" → telecom_plan
+- "요금제 추천해줘", "5만원 이하 플랜", "7만원 정도 요금제" → telecom_plan
 - "구독 서비스 추천", "넷플릭스 관련", "OTT 추천" → subscription
 - "영화 좋아해", "무제한", "3만원대", "많이" → multiturn_answer
 - "오늘 날씨", "파이썬 공부" → off_topic_boring
@@ -52,19 +58,24 @@ class EnhancedIntentClassifier:
 """)
 
     async def classify_intent(self, message: str, context: Dict[str, Any] = None) -> str:
-        """AI 기반 정확한 인텐트 분류 - 단순화"""
+        """AI 기반 정확한 인텐트 분류 - 가격 인식 강화"""
         try:
             # 입력 검증
             if not message or len(message.strip()) == 0:
                 return "off_topic_unclear"
 
             # 먼저 폴백 로직으로 확실한 케이스 체크
-            fallback_intent = self._simple_fallback_classification(message)
+            fallback_intent = self._enhanced_fallback_classification(message)
 
             # 확실한 케이스는 AI 호출 없이 바로 반환
             if fallback_intent in ["greeting", "nonsense", "tech_issue"]:
                 print(f"[DEBUG] Fallback classified intent: {fallback_intent}")
                 return fallback_intent
+
+            # 가격 관련은 확실히 요금제로 분류
+            if self._has_price_mention(message):
+                print(f"[DEBUG] Price mention detected, classifying as telecom_plan")
+                return "telecom_plan"
 
             # AI 분류 시도 (애매한 케이스만)
             try:
@@ -95,10 +106,46 @@ class EnhancedIntentClassifier:
 
         except Exception as e:
             print(f"[ERROR] Intent classification failed: {e}")
-            return self._simple_fallback_classification(message)
+            return self._enhanced_fallback_classification(message)
 
-    def _simple_fallback_classification(self, message: str) -> str:
-        """단순화된 키워드 기반 폴백"""
+    def _has_price_mention(self, message: str) -> bool:
+        """가격 언급 감지 - 강화된 한국어 처리"""
+        text_lower = message.lower().strip()
+
+        # 한국어 숫자 변환
+        korean_numbers = {
+            '일': '1', '이': '2', '삼': '3', '사': '4', '오': '5',
+            '육': '6', '칠': '7', '팔': '8', '구': '9', '십': '10'
+        }
+
+        for kr, num in korean_numbers.items():
+            text_lower = text_lower.replace(kr, num)
+
+        # 가격 관련 패턴들
+        price_patterns = [
+            r'\d+만\s*원?',           # "5만원", "5만"
+            r'\d{4,6}\s*원',          # "50000원"
+            r'\d+천\s*원?',           # "3천원"
+            r'\d+만원대',             # "3만원대"
+            r'\d+만원?\s*(이하|미만|까지|정도|쯤)',  # "5만원 이하"
+            r'\d+만원?\s*(이상|넘|초과)',          # "5만원 이상"
+            r'\d+[\-~]\d+만원?',      # "3-5만원"
+        ]
+
+        for pattern in price_patterns:
+            if re.search(pattern, text_lower):
+                print(f"[DEBUG] Price pattern detected: {pattern} in '{message}'")
+                return True
+
+        # 예산 관련 키워드
+        budget_keywords = ['예산', '돈', '가격', '비용', '통신비', '요금']
+        if any(keyword in text_lower for keyword in budget_keywords):
+            return True
+
+        return False
+
+    def _enhanced_fallback_classification(self, message: str) -> str:
+        """강화된 키워드 기반 폴백 - 가격 인식 개선"""
         lowered = message.lower().strip()
         original = message.strip()
 
@@ -113,6 +160,10 @@ class EnhancedIntentClassifier:
         # 입력이 너무 짧은 경우
         if len(lowered) < 2:
             return "off_topic_unclear"
+
+        # 가격 언급 확인 (높은 우선순위)
+        if self._has_price_mention(message):
+            return "telecom_plan"
 
         # 멀티턴 답변 감지 (짧고 단답형)
         if self._is_multiturn_answer(lowered):
@@ -206,7 +257,7 @@ class EnhancedIntentClassifier:
         # 멀티턴 질문에 대한 일반적인 답변들
         short_answers = [
             "드라마", "영화", "음악", "스포츠", "예능", "많이", "적게", "보통",
-            "무제한", "저렴", "3만원", "5만원", "좋아해", "좋아", "싫어",
+            "무제한", "저렴", "좋아해", "좋아", "싫어",
             "예", "아니요", "네", "아니", "맞아"
         ]
 
@@ -215,9 +266,9 @@ class EnhancedIntentClassifier:
             if answer in lowered:
                 return True
 
-        # 숫자+만원 패턴 (5자 이하)
+        # 숫자+만원 패턴 (5자 이하) - 가격 언급 제외
         if len(lowered) <= 5 and re.search(r'\d+만원?', lowered):
-            return True
+            return False  # 가격은 telecom_plan으로 분류
 
         return False
 
