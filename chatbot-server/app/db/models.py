@@ -58,6 +58,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=True)
     current_plan_id = Column(Integer, ForeignKey("plans.id"))
     remaining_data = Column(Integer, default=0)  # MB 단위
     remaining_share_data = Column(Integer, default=0)
