@@ -13,27 +13,26 @@ def get_intent_classifier():
         intent_classifier = EnhancedIntentClassifier()
     return intent_classifier
 
-
 def get_conversation_guard():
-    """대화 가드 싱글톤 인스턴스 (기존 함수명 유지)"""
+    """대화 가드 싱글톤 인스턴스"""
     global conversation_guard
     if conversation_guard is None:
         conversation_guard = ConversationGuard()
     return conversation_guard
 
 async def detect_intent(message: str, user_context: dict = None) -> str:
-    """강화된 인텐트 감지 - 이상한 입력 감지 포함"""
+    """강화된 인텐트 감지"""
     classifier = get_intent_classifier()
-    
+
     try:
         # 빈 메시지나 None 체크
         if not message or not message.strip():
             return "off_topic_unclear"
-            
+
         intent = await classifier.classify_intent(message, user_context)
         print(f"[DEBUG] Final detected intent: {intent} for message: '{message[:50]}...'")
         return intent
-        
+
     except Exception as e:
         print(f"[ERROR] Intent detection failed: {e}")
         # 폴백으로 간단한 키워드 체크
@@ -43,9 +42,9 @@ def _emergency_intent_fallback(message: str) -> str:
     """긴급 폴백 - 시스템 오류 시 사용"""
     if not message or len(message.strip()) < 2:
         return "nonsense"
-        
+
     lowered = message.lower().strip()
-    
+
     # 확실한 케이스들만 체크
     if any(word in lowered for word in ["요금제", "플랜", "추천"]):
         return "telecom_plan"
@@ -58,12 +57,12 @@ def _emergency_intent_fallback(message: str) -> str:
     else:
         return "off_topic_unclear"
 
-async def handle_off_topic_response(message: str, tone: str = "general") -> str:
-    """강화된 오프토픽 응답 처리 - nonsense 감지 포함"""
+async def handle_off_topic_response(message: str, tone: str = "general", session_id: str = None) -> str:
+    """오프토픽 응답 처리 - session_id 전달"""
     guard = get_conversation_guard()
-    
+
     try:
-        return await guard.handle_off_topic(message, tone)
+        return await guard.handle_off_topic(message, tone, session_id)
     except Exception as e:
         print(f"[ERROR] Off-topic handling failed: {e}")
         # 폴백 응답
@@ -80,7 +79,7 @@ def _emergency_off_topic_response(tone: str) -> str:
 요금제나 구독 서비스 관련해서 다시 문의해주세요!"""
 
 async def handle_tech_issue_response(message: str, tone: str = "general") -> str:
-    """기술 문제 응답 처리 (기존 함수명 유지)"""
+    """기술 문제 응답 처리"""
     guard = get_conversation_guard()
     try:
         return await guard.handle_tech_issue(message, tone)
@@ -95,11 +94,11 @@ def _emergency_tech_response(tone: str) -> str:
     else:
         return "기술적 문제가 발생했어요. 😔\n잠시 후 다시 시도해주세요!"
 
-async def handle_greeting_response(message: str, tone: str = "general") -> str:
-    """인사 응답 처리 (기존 함수명 유지)"""
+async def handle_greeting_response(message: str, tone: str = "general", session_id: str = None) -> str:
+    """인사 응답 처리 - session_id 전달"""
     guard = get_conversation_guard()
     try:
-        return await guard.handle_greeting(message, tone)
+        return await guard.handle_greeting(message, tone, session_id)
     except Exception as e:
         print(f"[ERROR] Greeting handling failed: {e}")
         return _emergency_greeting_response(tone)
@@ -112,7 +111,7 @@ def _emergency_greeting_response(tone: str) -> str:
         return "안녕하세요! 😊 LG유플러스 상담사입니다.\n어떤 도움이 필요하신가요?"
 
 async def handle_unknown_response(message: str, tone: str = "general") -> str:
-    """알 수 없는 요청 응답 처리 (기존 함수명 유지)"""
+    """알 수 없는 요청 응답 처리"""
     guard = get_conversation_guard()
     try:
         return await guard.handle_unknown(message, tone)
@@ -129,7 +128,7 @@ def _emergency_unknown_response(tone: str) -> str:
 
 # ============= 새로 추가된 오류 처리 함수들 =============
 async def handle_loading_error_response(tone: str = "general") -> str:
-    """로딩 실패 응답 (새 함수)"""
+    """로딩 실패 응답"""
     guard = get_conversation_guard()
     try:
         return await guard.handle_loading_failure(tone)
@@ -145,7 +144,7 @@ def _emergency_loading_response(tone: str) -> str:
         return "로딩 중 문제가 발생했어요. 😔\n잠시만 기다려주세요!"
 
 async def handle_api_error_response(tone: str = "general") -> str:
-    """API 오류 응답 (새 함수)"""
+    """API 오류 응답"""
     guard = get_conversation_guard()
     try:
         return await guard.handle_api_error(tone)
@@ -161,7 +160,7 @@ def _emergency_api_response(tone: str) -> str:
         return "시스템 오류가 발생했어요. 😔\n잠시 후 다시 시도해주세요!"
 
 async def handle_timeout_error_response(tone: str = "general") -> str:
-    """타임아웃 오류 응답 (새 함수)"""
+    """타임아웃 오류 응답"""
     guard = get_conversation_guard()
     try:
         return await guard.handle_timeout_error(tone)
@@ -176,9 +175,9 @@ def _emergency_timeout_response(tone: str) -> str:
     else:
         return "처리 시간이 초과되었어요. ⏰\n더 간단한 질문으로 다시 시도해주세요!"
 
-# ============= 🔥 새로운 nonsense 전용 함수 =============
+# ============= 새로운 nonsense 전용 함수 =============
 async def handle_nonsense_response(message: str, tone: str = "general") -> str:
-    """의미없는 입력 전용 응답 처리 (새 함수)"""
+    """의미없는 입력 전용 응답 처리"""
     guard = get_conversation_guard()
     try:
         # ConversationGuard에 _handle_nonsense_input 메서드가 있는지 확인
@@ -205,9 +204,8 @@ def _direct_nonsense_response(message: str, tone: str) -> str:
 명확한 질문으로 다시 문의해주시겠어요?
 
 예시:
-• "월 3만원 이하 요금제 추천해주세요"
-• "구독 서비스 추천 부탁드려요"
-• "현재 데이터 사용량 확인해주세요" """
+• "요금제 추천해주세요"
+• "구독 서비스 추천 부탁드려요" """
 
 def _emergency_nonsense_response(tone: str) -> str:
     """긴급 nonsense 응답"""
@@ -217,17 +215,17 @@ def _emergency_nonsense_response(tone: str) -> str:
         return "입력하신 내용을 이해하지 못했어요. 😔\n명확한 질문을 해주세요!"
 
 # ============= 통합 응답 처리 함수 =============
-async def handle_response_by_intent(intent: str, message: str, tone: str = "general") -> str:
+async def handle_response_by_intent(intent: str, message: str, tone: str = "general", session_id: str = None) -> str:
     """인텐트에 따른 통합 응답 처리"""
     try:
         if intent == "nonsense":
             return await handle_nonsense_response(message, tone)
         elif intent == "greeting":
-            return await handle_greeting_response(message, tone)
+            return await handle_greeting_response(message, tone, session_id)
         elif intent == "tech_issue":
             return await handle_tech_issue_response(message, tone)
         elif intent.startswith("off_topic"):
-            return await handle_off_topic_response(message, tone)
+            return await handle_off_topic_response(message, tone, session_id)
         else:
             return await handle_unknown_response(message, tone)
             
@@ -251,9 +249,9 @@ def validate_user_input(message: str) -> dict:
         "is_empty": False,
         "length": len(message) if message else 0,
         "char_variety": 0,
-        "has_korean": False,
+        "has_korean": True,
         "has_english": False,
-        "has_numbers": False,
+        "has_numbers": True,
         "has_special": False
     }
     

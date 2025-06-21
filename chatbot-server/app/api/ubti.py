@@ -47,7 +47,7 @@ def extract_json_from_response(response_text: str) -> str:
 
     return response_text.strip()
 
-@router.post("/ubti/question")
+@router.post("/ubti/question", summary="UBTI 질문", description="UBTI 성향 분석을 위한 4단계 질문을 스트리밍으로 제공합니다.")
 async def next_question(req: UBTIRequest):
     """UBTI 질문을 스트리밍으로 전송"""
     async def generate_question_stream():
@@ -103,7 +103,7 @@ async def next_question(req: UBTIRequest):
 
     return StreamingResponse(generate_question_stream(), media_type="text/event-stream")
 
-@router.post("/ubti/result")
+@router.post("/ubti/result", summary="UBTI 결과", description="4단계 질문 완료 후 사용자 성향에 맞는 UBTI 타입 및 맞춤 추천을 제공합니다.")
 async def final_result(req: UBTIRequest):
     """UBTI 최종 결과를 JSON으로 반환 (스트리밍 X) - ID 포함"""
     session_id = f"ubti_session:{req.session_id}"
@@ -153,10 +153,13 @@ async def final_result(req: UBTIRequest):
         parsed_result = json.loads(json_text)
         print(f"[DEBUG] Parsed result: {parsed_result}")
 
-        # 4. ID 검증
+        # 4. image_url 필드 기본값 처리
+        parsed_result = add_missing_image_urls(parsed_result)
+
+        # 5. ID 검증
         validate_ubti_response_ids(parsed_result, plans, subscriptions)
 
-        # 5. UBTIResult 스키마에 맞게 데이터 구성
+        # 6. UBTIResult 스키마에 맞게 데이터 구성
         result_data = UBTIResult(**parsed_result)
 
         return JSONResponse(
@@ -180,6 +183,28 @@ async def final_result(req: UBTIRequest):
     except Exception as e:
         print(f"[ERROR] 결과 처리 실패: {e}")
         raise HTTPException(status_code=500, detail="결과 처리 중 오류가 발생했습니다.")
+
+def add_missing_image_urls(parsed_result: dict) -> dict:
+    """🔥 누락된 image_url 필드에 기본값 추가"""
+    try:
+        # ubti_type에 image_url 추가
+        if "ubti_type" in parsed_result:
+            if "image_url" not in parsed_result["ubti_type"]:
+                code = parsed_result["ubti_type"].get("code", "default")
+                parsed_result["ubti_type"]["image_url"] = f"https://example.com/images/{code.lower()}.png"
+
+        # matching_type에 image_url 추가
+        if "matching_type" in parsed_result:
+            if "image_url" not in parsed_result["matching_type"]:
+                code = parsed_result["matching_type"].get("code", "default")
+                parsed_result["matching_type"]["image_url"] = f"https://example.com/images/{code.lower()}.png"
+
+        print(f"[DEBUG] Added missing image_url fields")
+        return parsed_result
+
+    except Exception as e:
+        print(f"[ERROR] Failed to add image_url fields: {e}")
+        return parsed_result
 
 def validate_ubti_response_ids(parsed_result: dict, plans: list, subscriptions: list):
     """UBTI 응답의 ID 유효성 검증"""

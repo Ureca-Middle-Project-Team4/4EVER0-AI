@@ -43,6 +43,7 @@ class UBType(Base):
     name = Column(String(50), nullable=False)
     emoji = Column(String(10))
     description = Column(Text, nullable=False)
+    image_url = Column(Text, nullable=False)
 
 class CouponLike(Base):
     __tablename__ = "coupon_likes"
@@ -57,11 +58,14 @@ class CouponLike(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    current_plan_id = Column(Integer, ForeignKey("plans.id"))
-    remaining_data = Column(Integer, default=0)  # MB 단위
-    remaining_share_data = Column(Integer, default=0)
-    remaining_voice = Column(Integer, default=0)  # 분 단위
-    remaining_sms = Column(Integer, default=0)
-    last_updated = Column(DateTime, default=lambda: datetime.now(KST))
+    id               = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name             = Column(String(100),  nullable=True)
+    email            = Column(String(255), nullable=True)
+    phone_number     = Column(String(20),  nullable=True)
+    plan_id          = Column(Integer, ForeignKey("plans.id"))
+    data_usage       = Column(Integer, default=0)  # 사용한 데이터(MB)
+    voice_usage      = Column(Integer, default=0)  # 사용한 통화(분)
+    sms_usage        = Column(Integer, default=0)  # 사용한 문자(건)
+    attendance_streak= Column(Integer, default=0)  # 연속 출석 일수
+    point            = Column(Integer, default=0)  # 포인트
 

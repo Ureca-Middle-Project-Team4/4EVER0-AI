@@ -91,7 +91,7 @@ def get_recommended_subscriptions_likes(ai_response: str):
     finally:
         db.close()
 
-@router.post("/chat/likes")
+@router.post("/chat/likes", summary="좋아요 기반 추천", description="사용자가 좋아요 표시한 브랜드를 기반으로 구독 서비스 조합을 추천합니다.")
 async def chat_likes(req: LikesChatRequest):
     async def generate_stream():
         # 1. handle_chat_likes에서 함수를 받아서 실행

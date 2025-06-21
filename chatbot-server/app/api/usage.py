@@ -228,10 +228,10 @@ def _generate_simple_explanation(usage, recommendation_type: str, recommended_pl
 
 고객님의 사용 습관에 가장 적합한 요금제를 선택하시면 됩니다."""
 
-@router.post("/usage/recommend")
+@router.post("/usage/recommend", summary="사용량 기반 추천", description="사용자의 실제 사용량 데이터를 분석하여 최적의 요금제를 추천합니다.")
 async def usage_based_recommendation(
     user_id: int = Query(..., description="사용자 ID"),
-    tone: str = Query("general", description="응답 톤 (general/muneoz)")
+    tone: str = Query("general", description="응답 톤 (general: 정중한 말투, muneoz: 친근한 말투)")
 ):
     """
     사용자 사용량 기반 요금제 추천 - 스트리밍 지원
@@ -322,7 +322,7 @@ async def usage_based_recommendation(
 
     return StreamingResponse(generate_stream(), media_type="text/event-stream")
 
-@router.get("/usage/{user_id}")
+@router.get("/usage/{user_id}", summary="사용량 조회", description="특정 사용자의 현재 요금제 사용량 및 상태를 조회합니다.")
 async def get_user_usage(user_id: int):
     """
     사용자 사용량 조회 - 실제 DB 연동
