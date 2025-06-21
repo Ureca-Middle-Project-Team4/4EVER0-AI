@@ -77,16 +77,8 @@ def extract_budget_from_text(text: str) -> tuple[int, int]:
 
     text_lower = text.lower()
 
-    # 🔥 "500기가", "500gb" 등 대용량 숫자 처리 추가
-    if re.search(r'(\d+)\s*(gb|기가)', text_lower):
-        gb_match = re.search(r'(\d+)\s*(gb|기가)', text_lower)
-        gb_amount = int(gb_match.group(1))
-        if gb_amount >= 100:  # 100GB 이상은 무조건 "많이"
-            return "많이"
-        elif gb_amount >= 10:
-            return "많이"
-        # ... 나머지 동일
-
+    # GB/기가 관련 처리는 제거 (이 함수는 예산 전용)
+    # 데이터 요구사항은 extract_data_requirement에서 처리
 
     # 1. 한국어 숫자 변환
     korean_numbers = {
@@ -98,61 +90,77 @@ def extract_budget_from_text(text: str) -> tuple[int, int]:
     for kr, num in korean_numbers.items():
         text_lower = text_lower.replace(kr, str(num))
 
+    print(f"[DEBUG] Budget text processing: '{text_lower}'")
+
     # 2. 다양한 패턴 매칭
     patterns = [
-        # "5만원", "50000원", "5만", "50000"
-        r'(\d+)만\s*원?',
-        r'(\d{4,6})\s*원?',
-        # "3-5만원", "30000-50000원"
-        r'(\d+)[\-~]\s*(\d+)만\s*원?',
-        r'(\d{4,6})[\-~]\s*(\d{4,6})\s*원?',
-        # "5만원 이하", "50000원 미만"
-        r'(\d+)만\s*원?\s*(이하|미만|까지)',
-        r'(\d{4,6})\s*원?\s*(이하|미만|까지)',
-        # "5만원 이상", "50000원 넘게"
+        # "5만원 이상", "50000원 넘게" - 이상 패턴 먼저
         r'(\d+)만\s*원?\s*(이상|넘|초과)',
         r'(\d{4,6})\s*원?\s*(이상|넘|초과)',
+        # "5만원 이하", "50000원 미만" - 이하 패턴
+        r'(\d+)만\s*원?\s*(이하|미만|까지)',
+        r'(\d{4,6})\s*원?\s*(이하|미만|까지)',
+        # "5만원", "50000원", "5만", "50000" - 기본 패턴
+        r'(\d+)만\s*원?',
+        r'(\d{4,6})\s*원?',
+        # "3-5만원", "30000-50000원" - 범위 패턴
+        r'(\d+)[\-~]\s*(\d+)만\s*원?',
+        r'(\d{4,6})[\-~]\s*(\d{4,6})\s*원?',
     ]
 
     # 패턴 매칭 시도
     for pattern in patterns:
         match = re.search(pattern, text_lower)
         if match:
-            if len(match.groups()) == 1:
+            print(f"[DEBUG] Pattern matched: {pattern}")
+
+            if len(match.groups()) == 2 and match.group(2) in ['이상', '넘', '초과']:
+                # 이상 처리
+                amount = int(match.group(1))
+                if '만' in pattern or amount < 100:
+                    amount *= 10000
+                print(f"[DEBUG] '이상' detected: {amount:,}원 이상")
+                return amount, 200000
+
+            elif len(match.groups()) == 2 and match.group(2) in ['이하', '미만', '까지']:
+                # 이하 처리
+                amount = int(match.group(1))
+                if '만' in pattern or amount < 100:
+                    amount *= 10000
+                print(f"[DEBUG] '이하' detected: {amount:,}원 이하")
+                return 0, amount
+
+            elif len(match.groups()) == 1:
                 # 단일 숫자
                 amount = int(match.group(1))
-                if '만' in pattern:
+                if '만' in pattern or amount < 100:
                     amount *= 10000
-
-                # 키워드에 따른 범위 설정
-                if any(word in text_lower for word in ['이하', '미만', '까지']):
-                    return 0, amount
-                elif any(word in text_lower for word in ['이상', '넘', '초과']):
-                    return amount, 200000
-                else:
-                    # 정확한 금액 주변 ±5000원
-                    return max(0, amount - 5000), amount + 10000
+                print(f"[DEBUG] Basic amount: {amount:,}원 ±5000원")
+                return max(0, amount - 5000), amount + 10000
 
             elif len(match.groups()) >= 2:
                 # 범위 지정
                 min_amount = int(match.group(1))
                 max_amount = int(match.group(2))
-
                 if '만' in pattern:
                     min_amount *= 10000
                     max_amount *= 10000
-
+                print(f"[DEBUG] Range: {min_amount:,}원 - {max_amount:,}원")
                 return min_amount, max_amount
 
     # 3. 키워드 기반 추정
     if any(word in text_lower for word in ['저렴', '싸', '가성비', '절약']):
+        print(f"[DEBUG] Keyword: 저렴")
         return 0, 35000
     elif any(word in text_lower for word in ['비싸', '프리미엄', '좋은', '고급']):
+        print(f"[DEBUG] Keyword: 고급")
         return 50000, 200000
     elif any(word in text_lower for word in ['보통', '적당', '일반']):
+        print(f"[DEBUG] Keyword: 보통")
         return 30000, 50000
 
     # 기본값: 전체 범위
+    print(f"[DEBUG] Using default range")
     return 0, 100000
 
 def extract_data_requirement(text: str) -> str:
