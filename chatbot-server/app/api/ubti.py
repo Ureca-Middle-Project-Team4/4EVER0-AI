@@ -47,7 +47,7 @@ def extract_json_from_response(response_text: str) -> str:
 
     return response_text.strip()
 
-@router.post("/ubti/question")
+@router.post("/ubti/question", summary="UBTI 질문", description="UBTI 성향 분석을 위한 4단계 질문을 스트리밍으로 제공합니다.")
 async def next_question(req: UBTIRequest):
     """UBTI 질문을 스트리밍으로 전송"""
     async def generate_question_stream():
@@ -103,7 +103,7 @@ async def next_question(req: UBTIRequest):
 
     return StreamingResponse(generate_question_stream(), media_type="text/event-stream")
 
-@router.post("/ubti/result")
+@router.post("/ubti/result", summary="UBTI 결과", description="4단계 질문 완료 후 사용자 성향에 맞는 UBTI 타입 및 맞춤 추천을 제공합니다.")
 async def final_result(req: UBTIRequest):
     """UBTI 최종 결과를 JSON으로 반환 (스트리밍 X) - ID 포함"""
     session_id = f"ubti_session:{req.session_id}"

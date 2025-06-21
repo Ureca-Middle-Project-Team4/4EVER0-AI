@@ -426,7 +426,7 @@ def get_recommended_subscriptions(req: ChatRequest, ai_response: str):
     finally:
         db.close()
 
-@router.post("/chat")
+@router.post("/chat", summary="채팅 대화", description="사용자와 AI 간의 실시간 스트리밍 채팅을 제공합니다. 요금제 및 구독 추천을 포함합니다.")
 async def chat(req: ChatRequest):
     async def generate_stream():
         # 1. handle_chat에서 스트리밍 함수 받기

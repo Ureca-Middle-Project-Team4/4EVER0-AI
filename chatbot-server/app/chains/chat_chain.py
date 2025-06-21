@@ -224,7 +224,7 @@ def smart_plan_recommendation(user_info: dict, plans: list) -> list:
                 if plan_price < min_budget:
                     # 예산보다 싸도 너무 싸면 안 좋음 (기능 부족 가능성)
                     gap = min_budget - plan_price
-                    if gap <= 10000:  # 1만원 차이까지는 OK
+                    if gap <= 5000:  # 5000원 차이까지는 OK
                         score += 40
                     else:
                         score += 20  # 너무 싸면 감점
@@ -500,7 +500,7 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "gener
         return create_simple_stream(error_text)
 
 async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone: str = "general"):
-    """최종 요금제 추천 - 프롬프트 템플릿 사용"""
+    """최종 요금제 추천 - 프롬프트 템플릿 사용 + 마크다운 줄바꿈 수정"""
     print(f"[DEBUG] get_final_plan_recommendation - tone: {tone}")
     print(f"[DEBUG] user_info: {user_info}")
 
@@ -517,10 +517,14 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone:
             **user_info
         }
 
-        # 추천된 요금제 정보
-        plans_text = "\n".join([f"- {p.name} ({format_price(p.price)}, {p.data}, {p.voice})" for p in recommended_plans])
+        # 🔥 마크다운 줄바꿈을 위한 명시적 \\n\\n 사용
+        plans_text = "\\n\\n".join([f"- {p.name} ({format_price(p.price)}, {p.data}, {p.voice})" for p in recommended_plans])
 
-        prompt_text = PLAN_PROMPTS["phone_plan_multi"][tone].format(
+        # 🔥 프롬프트 템플릿 사용
+        from app.prompts.get_prompt_template import get_prompt_template
+        prompt_template = get_prompt_template("phone_plan_multi", tone)
+
+        prompt_text = prompt_template.format(
             data_usage=merged_info['data_usage'],
             call_usage=merged_info['call_usage'],
             services=merged_info['services'],
@@ -564,7 +568,7 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone:
         return create_simple_stream(error_text)
 
 async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
-    """최종 구독 서비스 추천 - 프롬프트 템플릿 사용"""
+    """최종 구독 서비스 추천 - 프롬프트 템플릿 사용 + 마크다운 줄바꿈 수정"""
     print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
     print(f"[DEBUG] user_info: {user_info}")
 
@@ -579,12 +583,15 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
             **user_info
         }
 
-        # 데이터 포맷팅
-        main_text = "\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
-        life_text = "\n".join([f"- {b.name}" for b in life_items[:4]])
+        # 🔥 마크다운 줄바꿈을 위한 명시적 \\n\\n 사용
+        main_text = "\\n\\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
+        life_text = "\\n\\n".join([f"- {b.name}" for b in life_items[:4]])
+
+        # 🔥 프롬프트 템플릿 사용 (subscription_prompt.py에서 가져옴)
+        from app.prompts.subscription_prompt import SUBSCRIPTION_PROMPT
 
         prompt_text = SUBSCRIPTION_PROMPT[tone].format(
-            message="\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
+            message="\\n\\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
             main=main_text,
             life=life_text,
             history=""
