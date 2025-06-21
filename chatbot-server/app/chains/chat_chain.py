@@ -512,24 +512,13 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone:
         # 추천된 요금제 정보
         plans_text = "\n".join([f"- {p.name} ({format_price(p.price)}, {p.data}, {p.voice})" for p in recommended_plans])
 
-        if tone == "muneoz":
-            prompt_text = f"""무너가 4단계 답변 보고 완전 찰떡인 요금제 골라봤어! 🐙
-
-        네 답변: 데이터 {merged_info['data_usage']}, 통화 {merged_info['call_usage']}, 예산 {merged_info['budget']}
-
-        추천 요금제들:
-        {plans_text}
-
-        간결하게 1-2개 추천하고 "완전 추천!"으로 끝내줘."""
-        else:
-            prompt_text = f"""4단계 답변 분석해서 최적 요금제 추천드립니다.
-
-        고객 정보: 데이터 {merged_info['data_usage']}, 통화 {merged_info['call_usage']}, 예산 {merged_info['budget']}
-
-        추천 요금제:
-        {plans_text}
-
-        1-2개 간결하게 추천하고 "추천드립니다"로 마무리해주세요."""
+        prompt_text = PLAN_PROMPTS["phone_plan_multi"][tone].format(
+            data_usage=merged_info['data_usage'],
+            call_usage=merged_info['call_usage'],
+            services=merged_info['services'],
+            budget=merged_info['budget'],
+            plans=plans_text
+        )
 
         model = get_chat_model()
 
@@ -586,24 +575,12 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
         main_text = "\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
         life_text = "\n".join([f"- {b.name}" for b in life_items[:4]])
 
-        if tone == "muneoz":
-            prompt_text = f"""무너가 4단계 답변 보고 구독 조합 골라봤어! 🐙
-
-        네 답변: {', '.join([f"{k} {v}" for k, v in merged_info.items()])}
-
-        메인구독: {main_text}
-        라이프브랜드: {life_text}
-
-        메인 1개 + 라이프 1개 조합 추천하고 "완전 추천!"으로 끝내줘."""
-        else:
-            prompt_text = f"""4단계 답변 바탕으로 구독 조합 추천드립니다.
-
-        고객 정보: {', '.join([f"{k} {v}" for k, v in merged_info.items()])}
-
-        메인구독: {main_text}
-        라이프브랜드: {life_text}
-
-        메인 1개 + 라이프 1개 조합 추천하고 "추천드립니다"로 마무리해주세요."""
+        prompt_text = SUBSCRIPTION_PROMPT[tone].format(
+            message="\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
+            main=main_text,
+            life=life_text,
+            history=""
+        )
 
         model = get_chat_model()
 
