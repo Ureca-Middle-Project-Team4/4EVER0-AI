@@ -272,6 +272,7 @@ celerybeat.pid
 
 # Environments
 .env
+./chatbot-server/.env
 .venv
 env/
 venv/
@@ -346,4 +347,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/windows,macos,intellij,python
+# End of https://www.toptal.com/developers/gitignore/api/windows,macos,intellij,pythonchatbot-server/.env
