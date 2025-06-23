@@ -1,0 +1,37 @@
+services:
+  chatbot-server:
+    build:
+      context: ./chatbot-server
+    container_name: chatbot-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./chatbot-server/.env
+    depends_on:
+      - redis-ai
+      - mysql
+    restart: always
+
+  redis-ai:
+    image: redis:7
+    container_name: redis-ai
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: db_4ever0
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  redis_data:
+  mysql_data:

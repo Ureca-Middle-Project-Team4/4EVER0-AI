@@ -1,7 +1,10 @@
 import redis
 import json
+import os
 
-client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+redis_host = os.getenv("REDIS_HOST", "redis-ai")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
 def get_session(session_id: str) -> dict:
     """세션 데이터 조회"""
