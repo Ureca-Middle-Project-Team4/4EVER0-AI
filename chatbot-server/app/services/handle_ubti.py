@@ -156,7 +156,7 @@ async def get_ubti_types() -> Optional[str]:
             print("[ERROR] No UBTI types found in database")
             return None
 
-        types_text = "\\n\\n".join([
+        types_text = "\n\n".join([
             f"{ubti.emoji} {ubti.code} ({ubti.name})\\n\\n{ubti.description}"
             for ubti in ubti_types
         ])
@@ -177,7 +177,7 @@ async def get_plans_data() -> Optional[str]:
             print("[WARNING] No plans found")
             return None
 
-        plans_text = "\\n\\n".join([
+        plans_text = "\n\n".join([
             f"- {p.name} / {p.price}원 / {p.data or '-'} / {p.speed or '-'} / 공유:{p.share_data or '-'} / 통화:{p.voice or '-'} / 문자:{p.sms or '-'}"
             for p in plans
         ])
@@ -198,7 +198,7 @@ async def get_subscriptions_data() -> Optional[str]:
             print("[WARNING] No subscriptions found")
             return None
 
-        subscriptions_text = "\\n\\n".join([
+        subscriptions_text = "\n\n".join([
             f"- {s.title} ({s.category}) - {s.price}원"
             for s in subscriptions
         ])

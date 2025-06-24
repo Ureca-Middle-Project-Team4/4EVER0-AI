@@ -22,66 +22,27 @@ def create_simple_stream(text: str):
             await asyncio.sleep(0.05)
     return stream
 
-def extract_user_id_from_message(message: str) -> int:
-    """메시지에서 user_id 추출"""
-    # "user_id: 1", "사용자 1", "유저 1" 등의 패턴에서 숫자 추출
-    patterns = [
-        r'user_?id[:\s]*(\d+)',
-        r'사용자[:\s]*(\d+)',
-        r'유저[:\s]*(\d+)',
-        r'아이디[:\s]*(\d+)',
-        r'(\d+)번?\s*사용자',
-        r'(\d+)번?\s*유저'
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, message, re.IGNORECASE)
-        if match:
-            return int(match.group(1))
-
-    return None
-
-def _safe_price_format(price) -> str:
-    """가격을 안전하게 포맷팅"""
-    try:
-        if isinstance(price, str):
-            if '원' in price:
-                return price
-            price_num = int(price.replace(',', '').replace('원', ''))
-            return f"{price_num:,}원"
-        return f"{int(price):,}원"
-    except:
-        return str(price)
-
 async def handle_chat(req: ChatRequest):
-    """통일된 세션 키를 사용하는 채팅 핸들러"""
+    """통일된 세션 키를 사용하는 채팅 핸들러 - 멀티턴 개선"""
 
     tone = getattr(req, 'tone', 'general')
     print(f"[DEBUG] ========== HANDLE_CHAT START ==========")
     print(f"[DEBUG] Input - tone: {tone}, message: '{req.message}'")
 
-    # 세션에서 멀티턴 진행 상태 확인 - 통일된 키 사용
+    # 🔥 세션에서 멀티턴 진행 상태 확인 - 통일된 키 사용
     session = get_session(req.session_id)
+    print(f"[DEBUG] Current session keys: {list(session.keys())}")
 
-    # 기존 키들을 통일된 키로 변환
-    phone_plan_step = session.get("phone_plan_flow_step", 0) or session.get("plan_step", 0)
-    subscription_step = session.get("subscription_flow_step", 0) or session.get("subscription_step", 0)
+    # 기존 키들을 통일된 키로 변환 (마이그레이션)
+    _migrate_session_keys(session, req.session_id)
 
-    # 통일된 키로 저장
-    if session.get("plan_step") and not session.get("phone_plan_flow_step"):
-        session["phone_plan_flow_step"] = session.pop("plan_step")
-        session["user_info"] = session.pop("plan_info", {})
-        save_session(req.session_id, session)
+    # 현재 멀티턴 상태 확인
+    phone_plan_step = session.get("phone_plan_flow_step", 0)
+    subscription_step = session.get("subscription_flow_step", 0)
 
-    if session.get("subscription_step") and not session.get("subscription_flow_step"):
-        session["subscription_flow_step"] = session.pop("subscription_step")
-        session["user_info"] = session.pop("subscription_info", {})
-        save_session(req.session_id, session)
+    print(f"[DEBUG] Multiturn status - phone_plan: {phone_plan_step}, subscription: {subscription_step}")
 
-    print(f"[DEBUG] Session state - phone_plan_step: {phone_plan_step}, subscription_step: {subscription_step}")
-    print(f"[DEBUG] Session keys: {list(session.keys())}")
-
-    # 멀티턴이 진행 중이면 해당 플로우 계속 진행
+    # 🔥 멀티턴이 진행 중이면 해당 플로우 계속 진행
     if phone_plan_step > 0:
         print(f"[DEBUG] >>> CONTINUING PHONE PLAN MULTI-TURN (step: {phone_plan_step}) <<<")
         try:
@@ -89,11 +50,7 @@ async def handle_chat(req: ChatRequest):
         except Exception as e:
             print(f"[ERROR] Phone plan multi-turn failed: {e}")
             # 플로우 초기화 후 에러 응답
-            session.pop("phone_plan_flow_step", None)
-            session.pop("plan_step", None)
-            session.pop("user_info", None)
-            session.pop("plan_info", None)
-            save_session(req.session_id, session)
+            _reset_multiturn_session(session, req.session_id, "phone_plan")
             return create_simple_stream("요금제 질문 중 오류가 발생했어요. 처음부터 다시 시작해주세요! 😅")
 
     elif subscription_step > 0:
@@ -103,28 +60,42 @@ async def handle_chat(req: ChatRequest):
         except Exception as e:
             print(f"[ERROR] Subscription multi-turn failed: {e}")
             # 플로우 초기화 후 에러 응답
-            session.pop("subscription_flow_step", None)
-            session.pop("subscription_step", None)
-            session.pop("user_info", None)
-            session.pop("subscription_info", None)
-            save_session(req.session_id, session)
+            _reset_multiturn_session(session, req.session_id, "subscription")
             return create_simple_stream("구독 서비스 질문 중 오류가 발생했어요. 처음부터 다시 시작해주세요! 😅")
 
-    # 새로운 대화 - AI 기반 인텐트 감지
+    # 🔥 새로운 대화 - AI 기반 인텐트 감지 (컨텍스트 포함)
     print(f"[DEBUG] >>> STARTING NEW CONVERSATION - DETECTING INTENT <<<")
     try:
-        intent = await detect_intent(req.message)
-        print(f"[DEBUG] >>> AI DETECTED INTENT: '{intent}' <<<")
+        # 세션 컨텍스트를 인텐트 분류에 전달
+        intent = await detect_intent(req.message, user_context=session)
+        print(f"[DEBUG] >>> AI DETECTED INTENT: '{intent}' with context <<<")
     except Exception as e:
         print(f"[ERROR] Intent detection failed: {e}")
         intent = "off_topic_unclear"
 
-    # 인텐트별 처리
+    # 🔥 인텐트별 처리 - multiturn_answer 우선 처리
     print(f"[DEBUG] >>> PROCESSING INTENT: '{intent}' <<<")
 
     try:
+        # 멀티턴 답변 처리 (최우선)
+        if intent == "multiturn_answer":
+            print(f"[DEBUG] >>> HANDLING MULTITURN_ANSWER <<<")
+            # 현재 진행 중인 플로우가 없다면 새로 시작
+            if phone_plan_step == 0 and subscription_step == 0:
+                # 답변 내용에 따라 적절한 플로우 시작
+                if _should_start_plan_flow(req.message):
+                    return await get_multi_turn_chain(req, "phone_plan_multi", tone)
+                elif _should_start_subscription_flow(req.message):
+                    return await get_multi_turn_chain(req, "subscription_multi", tone)
+                else:
+                    # 기본적으로 요금제 플로우 시작
+                    return await get_multi_turn_chain(req, "phone_plan_multi", tone)
+            else:
+                # 이미 플로우가 진행 중이면 계속 진행 (위에서 처리됨)
+                return create_simple_stream("멀티턴 처리 중 문제가 발생했어요. 😅")
+
         # 인사 처리 (최우선)
-        if intent == "greeting" or req.message.lower().strip() in ["안녕", "hi", "hello", "하이", "헬로"]:
+        elif intent == "greeting" or req.message.lower().strip() in ["안녕", "hi", "hello", "하이", "헬로"]:
             print(f"[DEBUG] >>> HANDLING GREETING <<<")
             response_text = await handle_greeting_response(req.message, tone)
             return create_simple_stream(response_text)
@@ -198,16 +169,16 @@ UBTI는 전용 API를 통해 진행됩니다!
                 response_text = """안뇽! 🤟 나는 무너야~ 🐙
 
 요금제나 구독 서비스 관련해서 뭐든지 물어봐!
-• 요금제 추천해줘
-• 구독 서비스 추천해줘
+- 요금제 추천해줘
+- 구독 서비스 추천해줘
 
 뭘 도와줄까? 💜"""
             else:
                 response_text = """안녕하세요! 😊 LG유플러스 상담 AI입니다.
 
 다음과 같은 서비스를 도와드릴 수 있어요:
-• 요금제 추천해주세요
-• 구독 서비스 추천해주세요
+- 요금제 추천해주세요
+- 구독 서비스 추천해주세요
 
 어떤 도움이 필요하신가요?"""
             return create_simple_stream(response_text)
@@ -217,6 +188,66 @@ UBTI는 전용 API를 통해 진행됩니다!
         import traceback
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
         return create_simple_stream(await handle_api_error_response(tone))
+
+def _migrate_session_keys(session: dict, session_id: str):
+    """기존 세션 키를 통일된 키로 마이그레이션"""
+    migrated = False
+
+    # 기존 키에서 통일된 키로 변환
+    if "plan_step" in session and not session.get("phone_plan_flow_step"):
+        session["phone_plan_flow_step"] = session.pop("plan_step")
+        if "plan_info" in session:
+            session["user_info"] = session.pop("plan_info")
+        migrated = True
+
+    if "subscription_step" in session and not session.get("subscription_flow_step"):
+        session["subscription_flow_step"] = session.pop("subscription_step")
+        if "subscription_info" in session:
+            session["user_info"] = session.pop("subscription_info")
+        migrated = True
+
+    # 마이그레이션이 발생했으면 저장
+    if migrated:
+        save_session(session_id, session)
+        print(f"[DEBUG] Session keys migrated successfully")
+
+def _reset_multiturn_session(session: dict, session_id: str, flow_type: str):
+    """멀티턴 세션 초기화"""
+    if flow_type == "phone_plan":
+        session.pop("phone_plan_flow_step", None)
+        session.pop("plan_step", None)
+    elif flow_type == "subscription":
+        session.pop("subscription_flow_step", None)
+        session.pop("subscription_step", None)
+
+    session.pop("user_info", None)
+    session.pop("plan_info", None)
+    session.pop("subscription_info", None)
+
+    save_session(session_id, session)
+    print(f"[DEBUG] {flow_type} multiturn session reset")
+
+def _should_start_plan_flow(message: str) -> bool:
+    """메시지가 요금제 플로우를 시작해야 하는지 판단"""
+    message_lower = message.lower()
+
+    plan_indicators = [
+        "gb", "데이터", "통화", "무제한", "5g", "lte",
+        "만원", "요금", "통신비", "플랜", "너겟", "라이트", "프리미엄"
+    ]
+
+    return any(indicator in message_lower for indicator in plan_indicators)
+
+def _should_start_subscription_flow(message: str) -> bool:
+    """메시지가 구독 플로우를 시작해야 하는지 판단"""
+    message_lower = message.lower()
+
+    subscription_indicators = [
+        "구독", "ott", "넷플릭스", "유튜브", "음악", "지니",
+        "스포티파이", "웨이브", "드라마", "영화", "스타벅스"
+    ]
+
+    return any(indicator in message_lower for indicator in subscription_indicators)
 
 async def handle_api_error_response(tone: str = "general") -> str:
     """API 오류 시 응답"""

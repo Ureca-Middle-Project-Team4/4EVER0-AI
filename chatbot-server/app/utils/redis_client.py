@@ -56,8 +56,11 @@ def get_session(session_id: str) -> dict:
         # JSON 파싱
         session_data = json.loads(data)
         
+        # 압축 해제
+        decompressed_data = decompress_session_data(session_data)
+
         # 불필요한 키 제거 (메모리 절약)
-        cleaned_data = clean_session_data(session_data)
+        cleaned_data = clean_session_data(decompressed_data)
         
         print(f"[DEBUG] 세션 조회: {session_id} (크기: {len(data)} bytes)")
         return cleaned_data
@@ -108,16 +111,17 @@ def clean_session_data(data: dict) -> dict:
     # 보존할 핵심 키만 유지
     essential_keys = {
         'phone_plan_flow_step', 'subscription_flow_step',
-        'user_info', 'history'
+        'user_info', 'history', 'plan_step', 'subscription_step',
+        'plan_info', 'subscription_info', 'last_recommendation_type'
     }
     
     cleaned = {}
     for key, value in data.items():
         if key in essential_keys:
             if key == 'history':
-                # 히스토리는 최근 5개만 유지
+                # 히스토리는 최근 10개만 유지
                 if isinstance(value, list):
-                    cleaned[key] = value[-5:]
+                    cleaned[key] = value[-10:]
                 else:
                     cleaned[key] = value
             else:
