@@ -9,6 +9,8 @@ from app.api.chat_like import router as chat_like_router
 from app.api.ubti import router as ubti_router
 from app.api.user import router as user_router
 from app.db.database import engine, Base
+from app.utils.redis_client import get_redis_memory_info, emergency_cleanup
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,6 +80,31 @@ async def api_status():
             "UBTI 분석": "active",
             "Redis 세션": "active",
         },
+    }
+
+@app.get("/redis/status", tags=["Redis 모니터링"])
+async def redis_status():
+    """Redis 메모리 사용량 및 상태 확인"""
+    return get_redis_memory_info()
+
+@app.post("/redis/cleanup", tags=["Redis 관리"])
+async def redis_cleanup():
+    """긴급 Redis 메모리 정리 (모든 세션 삭제)"""
+    success = emergency_cleanup()
+    return {
+        "success": success,
+        "message": "모든 세션이 삭제되었습니다" if success else "정리 실패"
+    }
+
+@app.get("/health/detailed", tags=["헬스체크"])
+async def detailed_health():
+    """상세 헬스체크 (Redis 포함)"""
+    redis_info = get_redis_memory_info()
+
+    return {
+        "api_status": "healthy",
+        "redis": redis_info,
+        "timestamp": time.time()
     }
 
 # 예외 처리: 404 Not Found
