@@ -34,10 +34,27 @@ class ConversationGuard:
         name_part = self._get_user_name(session_id)
 
         # 세분화된 인텐트에 따른 처리
-        from app.utils.intent_classifier import EnhancedIntentClassifier
-        intent_classifier = EnhancedIntentClassifier()
-        detailed_intent = await intent_classifier.classify_intent(message)
+        try:
+            from app.utils.intent_classifier import EnhancedIntentClassifier
+            intent_classifier = EnhancedIntentClassifier()
+            detailed_intent = await intent_classifier.classify_intent(message)
+        except ImportError as e:
+            print(f"[ERROR] Intent classifier import failed: {e}")
+            detailed_intent = "off_topic_unclear"  # 기본값 사용
 
+        print(f"[DEBUG] Off-topic detailed intent: {detailed_intent}")
+
+        if detailed_intent == "nonsense":
+            return await self._handle_nonsense_input(message, tone, name_part)
+        elif detailed_intent == "off_topic_interesting":
+            return await self._handle_interesting_off_topic(message, tone, name_part)
+        elif detailed_intent == "off_topic_unclear":
+            return await self._handle_unclear_question(message, tone, name_part)
+        elif detailed_intent == "off_topic_boring":
+            return await self._handle_boring_off_topic(message, tone, name_part)
+        else:
+            # 기본 오프토픽 처리
+            return await self._handle_general_off_topic(message, tone, name_part)
         print(f"[DEBUG] Off-topic detailed intent: {detailed_intent}")
 
         if detailed_intent == "nonsense":

@@ -517,10 +517,9 @@ async def get_final_plan_recommendation(req: ChatRequest, user_info: dict, tone:
             **user_info
         }
 
-        # 🔥 마크다운 줄바꿈을 위한 명시적 \\n\\n 사용
-        plans_text = "\\n\\n".join([f"- {p.name} ({format_price(p.price)}, {p.data}, {p.voice})" for p in recommended_plans])
+        plans_text = "\n\n".join([f"- {p.name} ({format_price(p.price)}, {p.data}, {p.voice})" for p in recommended_plans])
 
-        # 🔥 프롬프트 템플릿 사용
+        # 프롬프트 템플릿 사용
         from app.prompts.get_prompt_template import get_prompt_template
         prompt_template = get_prompt_template("phone_plan_multi", tone)
 
@@ -583,15 +582,14 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
             **user_info
         }
 
-        # 🔥 마크다운 줄바꿈을 위한 명시적 \\n\\n 사용
-        main_text = "\\n\\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
-        life_text = "\\n\\n".join([f"- {b.name}" for b in life_items[:4]])
+        main_text = "\n\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
+        life_text = "\n\n".join([f"- {b.name}" for b in life_items[:4]])
 
-        # 🔥 프롬프트 템플릿 사용 (subscription_prompt.py에서 가져옴)
+        # 프롬프트 템플릿 사용 (subscription_prompt.py에서 가져옴)
         from app.prompts.subscription_prompt import SUBSCRIPTION_PROMPT
 
         prompt_text = SUBSCRIPTION_PROMPT[tone].format(
-            message="\\n\\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
+            message="\n\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
             main=main_text,
             life=life_text,
             history=""

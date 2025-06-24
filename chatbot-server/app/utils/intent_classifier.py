@@ -1,4 +1,5 @@
-# app/utils/intent_classifier.py - 가격 인식 강화
+# chatbot-server/app/utils/intent_classifier.py - 멀티턴 지원 강화
+
 import os
 import re
 from typing import Dict, Any
@@ -17,70 +18,83 @@ class EnhancedIntentClassifier:
         self.intent_prompt = ChatPromptTemplate.from_template("""
 당신은 LG유플러스 챗봇의 인텐트 분류 전문가입니다.
 
-사용자 메시지를 분석하여 정확한 인텐트를 분류해주세요.
+사용자 메시지와 대화 컨텍스트를 분석하여 정확한 인텐트를 분류해주세요.
 
-🎯 **분류 가능한 인텐트 (단순화):**
+🎯 **분류 가능한 인텐트:**
 1. **greeting**: 인사, 처음 방문 (안녕, hi, hello, 하이, 헬로, 반가워 등)
 2. **telecom_plan**: 요금제 관련 질문 및 추천 요청
 3. **subscription**: 구독 서비스, OTT, 음악 관련 질문 및 추천 요청
 4. **current_usage**: 현재 요금제 상태, 남은 데이터/통화량 확인
 5. **ubti**: UBTI, 성향 분석 관련
-6. **off_topic_interesting**: 재미있지만 통신과 무관한 주제 (영화, 음식, 여행 등)
-7. **off_topic_boring**: 일반적이고 통신과 무관한 주제 (날씨, 시간, 기술 등)
-8. **off_topic_unclear**: 의도를 파악하기 어려운 애매한 질문
-9. **nonsense**: 의미 없는 문자열, 랜덤 텍스트, 테스트 입력
-10. **tech_issue**: 기술적 문제, 오류 상황
-11. **multiturn_answer**: 질문에 대한 간단한 답변 (스포츠, 영화, 무제한, 3만원 등)
+6. **multiturn_answer**: 멀티턴 대화 중 질문에 대한 답변 (중요!)
+7. **off_topic_interesting**: 재미있지만 통신과 무관한 주제
+8. **off_topic_boring**: 일반적이고 통신과 무관한 주제
+9. **off_topic_unclear**: 의도를 파악하기 어려운 애매한 질문
+10. **nonsense**: 의미 없는 문자열, 랜덤 텍스트, 테스트 입력
+11. **tech_issue**: 기술적 문제, 오류 상황
 
-📋 **중요한 구분 기준:**
-- **greeting**: 인사말이 최우선 (안녕, hi, hello, 하이, 헬로, 반가워, 안뇽 등)
-- **telecom_plan**: 요금제, 통신비, 데이터, 통화, 5G, LTE, 플랜, 너겟, 라이트, 프리미엄 관련
-- **subscription**: 구독, OTT, 넷플릭스, 유튜브, 음악, 지니, 스포티파이, 웨이브 관련
-- **multiturn_answer**: 짧고 간단한 답변 형태 (10자 이하, 단답형)
+📋 **멀티턴 대화 감지 규칙 (매우 중요!):**
+- 컨텍스트에 "flow_step"이 있으면 → **multiturn_answer**
+- 질문형 메시지 뒤의 답변 → **multiturn_answer**
+- 짧은 단답형 (10자 이하) → **multiturn_answer**
+- 예: "5GB", "많이", "3만원", "드라마", "스포츠", "저렴하게" 등
 
 📋 **가격 관련 특별 처리**:
-- "5만원", "7만원", "십만원", "오만원" 등 → telecom_plan
-- "3만원대", "5만원 이하", "7만원 정도" 등 → telecom_plan
-- 가격과 함께 언급된 모든 표현 → telecom_plan
+- "5만원", "7만원", "십만원", "오만원" 등 → **telecom_plan**
+- "3만원대", "5만원 이하", "7만원 정도" 등 → **telecom_plan**
 
 📋 **예시:**
-- "안녕", "하이", "hello", "반가워" → greeting (최우선)
-- "요금제 추천해줘", "5만원 이하 플랜", "7만원 정도 요금제" → telecom_plan
-- "구독 서비스 추천", "넷플릭스 관련", "OTT 추천" → subscription
-- "영화 좋아해", "무제한", "3만원대", "많이" → multiturn_answer
-- "오늘 날씨", "파이썬 공부" → off_topic_boring
-- "맛집 추천", "여행 계획" → off_topic_interesting
+- "안녕", "하이" → **greeting**
+- "요금제 추천해줘" → **telecom_plan**
+- "5GB" (멀티턴 중) → **multiturn_answer**
+- "많이 써요" (멀티턴 중) → **multiturn_answer**
+- "영화 좋아해" (첫 메시지) → **off_topic_interesting**
+- "영화 좋아해" (멀티턴 중) → **multiturn_answer**
 
 사용자 메시지: "{message}"
+대화 컨텍스트: {context}
 
 🚨 **중요**: 응답은 반드시 위 인텐트 중 하나로만 답변하세요.
-응답: 인텐트명만 출력 (예: greeting, telecom_plan)
+응답: 인텐트명만 출력 (예: greeting, multiturn_answer)
 """)
 
     async def classify_intent(self, message: str, context: Dict[str, Any] = None) -> str:
-        """AI 기반 정확한 인텐트 분류 - 가격 인식 강화"""
+        """AI 기반 정확한 인텐트 분류 - 멀티턴 우선 처리"""
         try:
             # 입력 검증
             if not message or len(message.strip()) == 0:
                 return "off_topic_unclear"
 
-            # 먼저 폴백 로직으로 확실한 케이스 체크
-            fallback_intent = self._enhanced_fallback_classification(message)
+            # 🔥 멀티턴 컨텍스트 우선 확인
+            if context and self._is_multiturn_context(context):
+                print(f"[DEBUG] Multiturn context detected: {list(context.keys())}")
+                return "multiturn_answer"
+
+            # 폴백 로직으로 확실한 케이스 체크
+            fallback_intent = self._enhanced_fallback_classification(message, context)
 
             # 확실한 케이스는 AI 호출 없이 바로 반환
-            if fallback_intent in ["greeting", "nonsense", "tech_issue"]:
+            if fallback_intent in ["greeting", "nonsense", "tech_issue", "multiturn_answer"]:
                 print(f"[DEBUG] Fallback classified intent: {fallback_intent}")
                 return fallback_intent
 
             # 가격 관련은 확실히 요금제로 분류
             if self._has_price_mention(message):
+                # 🔥 단, 멀티턴 중이면 multiturn_answer
+                if context and self._is_multiturn_context(context):
+                    return "multiturn_answer"
                 print(f"[DEBUG] Price mention detected, classifying as telecom_plan")
                 return "telecom_plan"
 
             # AI 분류 시도 (애매한 케이스만)
             try:
+                context_str = self._format_context(context) if context else "대화 시작"
+
                 chain = self.intent_prompt | self.llm
-                response = await asyncio.wait_for(chain.ainvoke({"message": message}), timeout=8.0)
+                response = await asyncio.wait_for(
+                    chain.ainvoke({"message": message, "context": context_str}),
+                    timeout=8.0
+                )
                 intent = response.content.strip().lower()
 
                 # 유효한 인텐트인지 검증
@@ -106,7 +120,63 @@ class EnhancedIntentClassifier:
 
         except Exception as e:
             print(f"[ERROR] Intent classification failed: {e}")
-            return self._enhanced_fallback_classification(message)
+            return self._enhanced_fallback_classification(message, context)
+
+    def _is_multiturn_context(self, context: Dict[str, Any]) -> bool:
+        """멀티턴 대화 컨텍스트 감지"""
+        if not context:
+            return False
+
+        # 멀티턴 플로우 키들 확인
+        multiturn_keys = [
+            "phone_plan_flow_step", "subscription_flow_step",
+            "plan_step", "subscription_step", "ubti_step"
+        ]
+
+        for key in multiturn_keys:
+            if key in context:
+                value = context[key]
+                # 안전한 타입 체크
+                if isinstance(value, (int, float)) and value > 0:
+                    return True
+                elif isinstance(value, str) and value != '0' and value.strip():
+                    try:
+                        if int(value) > 0:
+                            return True
+                    except (ValueError, TypeError):
+                        pass
+
+        # user_info가 있으면 질문 받는 중
+        if "user_info" in context:
+            return True
+
+        return False
+
+    def _format_context(self, context: Dict[str, Any]) -> str:
+        """컨텍스트를 문자열로 포맷팅"""
+        if not context:
+            return "대화 시작"
+
+        info_parts = []
+
+        # 멀티턴 상태 확인
+        if self._is_multiturn_context(context):
+            info_parts.append("멀티턴_대화_진행중")
+
+        # 플로우 단계 정보
+        for key in ["phone_plan_flow_step", "subscription_flow_step"]:
+            if key in context and context[key] > 0:
+                info_parts.append(f"{key}:{context[key]}")
+
+        # 사용자 정보
+        if "user_info" in context:
+            user_info = context["user_info"]
+            if isinstance(user_info, dict):
+                for k, v in user_info.items():
+                    if v:
+                        info_parts.append(f"{k}:{v}")
+
+        return ", ".join(info_parts) if info_parts else "대화 시작"
 
     def _has_price_mention(self, message: str) -> bool:
         """가격 언급 감지 - 강화된 한국어 처리"""
@@ -144,10 +214,15 @@ class EnhancedIntentClassifier:
 
         return False
 
-    def _enhanced_fallback_classification(self, message: str) -> str:
-        """강화된 키워드 기반 폴백 - 가격 인식 개선"""
+    def _enhanced_fallback_classification(self, message: str, context: Dict[str, Any] = None) -> str:
+        """강화된 키워드 기반 폴백 - 멀티턴 우선 처리"""
         lowered = message.lower().strip()
         original = message.strip()
+
+        # 🔥 멀티턴 컨텍스트 우선 확인
+        if context and self._is_multiturn_context(context):
+            print(f"[DEBUG] Multiturn context in fallback classification")
+            return "multiturn_answer"
 
         # 의미없는 입력 감지 (최우선)
         if self._is_nonsense_input(original, lowered):
@@ -157,17 +232,13 @@ class EnhancedIntentClassifier:
         if self._is_greeting_input(lowered):
             return "greeting"
 
-        # 입력이 너무 짧은 경우
-        if len(lowered) < 2:
-            return "off_topic_unclear"
+        # 입력이 너무 짧은 경우 → 멀티턴 답변일 가능성
+        if len(lowered) <= 10 and self._is_likely_multiturn_answer(lowered):
+            return "multiturn_answer"
 
         # 가격 언급 확인 (높은 우선순위)
         if self._has_price_mention(message):
             return "telecom_plan"
-
-        # 멀티턴 답변 감지 (짧고 단답형)
-        if self._is_multiturn_answer(lowered):
-            return "multiturn_answer"
 
         # 기술 문제 관련
         tech_keywords = [
@@ -229,6 +300,36 @@ class EnhancedIntentClassifier:
         print(f"[DEBUG] No clear classification, defaulting to off_topic_unclear")
         return "off_topic_unclear"
 
+    def _is_likely_multiturn_answer(self, lowered: str) -> bool:
+        """멀티턴 대화에서의 답변일 가능성 확인"""
+        # 10자 이하 짧은 답변들
+        short_answers = [
+            "드라마", "영화", "음악", "스포츠", "예능", "많이", "적게", "보통",
+            "무제한", "저렴", "좋아해", "좋아", "싫어", "가끔", "자주",
+            "예", "아니요", "네", "아니", "맞아", "글쎄", "모르겠어",
+            "3만원", "5만원", "7만원", "10만원", "3gb", "5gb", "10gb",
+            "출퇴근", "저녁", "주말", "밤", "아침", "점심", "낮", "새벽"
+        ]
+
+        # 키워드 완전 포함 체크
+        for answer in short_answers:
+            if answer in lowered:
+                return True
+
+        # 숫자+단위 패턴 (5자 이하)
+        if len(lowered) <= 5:
+            patterns = [
+                r'\d+gb',      # "5gb"
+                r'\d+만원?',   # "3만원"
+                r'\d+시간?',   # "2시간"
+                r'\d+분',      # "30분"
+            ]
+            for pattern in patterns:
+                if re.search(pattern, lowered):
+                    return True
+
+        return False
+
     def _is_greeting_input(self, lowered: str) -> bool:
         """인사 입력 감지 - 정확도 향상"""
         # 정확한 인사말들
@@ -244,31 +345,6 @@ class EnhancedIntentClassifier:
             for pattern in start_patterns:
                 if lowered.startswith(pattern):
                     return True
-
-        return False
-
-    def _is_multiturn_answer(self, lowered: str) -> bool:
-        """멀티턴 대화에서의 답변 감지 - 단답형만"""
-
-        # 10자 이하 짧은 답변만 체크
-        if len(lowered) > 10:
-            return False
-
-        # 멀티턴 질문에 대한 일반적인 답변들
-        short_answers = [
-            "드라마", "영화", "음악", "스포츠", "예능", "많이", "적게", "보통",
-            "무제한", "저렴", "좋아해", "좋아", "싫어",
-            "예", "아니요", "네", "아니", "맞아"
-        ]
-
-        # 키워드 완전 포함 체크
-        for answer in short_answers:
-            if answer in lowered:
-                return True
-
-        # 숫자+만원 패턴 (5자 이하) - 가격 언급 제외
-        if len(lowered) <= 5 and re.search(r'\d+만원?', lowered):
-            return False  # 가격은 telecom_plan으로 분류
 
         return False
 

@@ -1,3 +1,5 @@
+# chatbot-server/app/api/chat.py - 추천 로직 수정
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from app.schemas.chat import ChatRequest
@@ -38,6 +40,32 @@ def is_subscription_recommendation(ai_response: str) -> bool:
     plan_keywords = ["요금제", "너겟", "라이트", "프리미엄", "플랜", "통신비", "GB", "데이터", "통화"]
     if any(keyword in ai_response for keyword in plan_keywords):
         print(f"[DEBUG] Contains plan keywords, not a subscription recommendation")
+        return False
+
+    # 🔥 안내 메시지 키워드가 있으면 추천이 아님
+    guidance_keywords = [
+        '좋아요한 브랜드가 없',
+        '사용량 데이터를 찾을 수 없',
+        '요금제를 먼저 가입',
+        '핫플레이스 탭',
+        '스토어맵',
+        '일반 채팅으로',
+        '구독 서비스 추천해주세요',
+        '기본 추천을',
+        '며칠 사용한 후',
+        '데이터가 준비되지 않은',
+        '브랜드를 못 찾겠',
+        '데이터가 없어',
+        '다시 시도해',
+        '문의해주세요',
+        '충분한 사용 데이터가',
+        '먼저 해봐',
+        '로그인이 필요한',
+        '가입하지 않았거나'
+    ]
+
+    if any(keyword in ai_response for keyword in guidance_keywords):
+        print(f"[DEBUG] Contains guidance keywords, not a subscription recommendation")
         return False
 
     # 구독 서비스 관련 키워드 확인
@@ -173,7 +201,6 @@ def smart_plan_recommendation(ai_response: str, req: ChatRequest) -> list:
             if mentioned_plans:
                 print(f"[DEBUG] AI mentioned specific plans in order: {[p.name for p in mentioned_plans]}")
                 return mentioned_plans[:2]
-
 
         if plan_mentions:
             # AI가 구체적으로 언급한 요금제들 조회
@@ -331,19 +358,61 @@ def get_recommended_plans(req: ChatRequest, ai_response: str = ""):
         db.close()
 
 def get_recommended_subscriptions(req: ChatRequest, ai_response: str):
-    """AI 응답에서 구독 서비스 추천 정보 추출 - 개선된 버전"""
+    """AI 응답에서 구독 서비스 추천 정보 추출 - 🔥 기본 추천 완전 제거"""
 
     db = SessionLocal()
     try:
         print(f"[DEBUG] get_recommended_subscriptions - analyzing: {ai_response[:200]}...")
 
-        # AI 응답에서 구독 서비스와 브랜드 추출
+        # 🔥 안내 메시지 키워드가 있으면 추천 안함
+        guidance_keywords = [
+            '좋아요한 브랜드가 없',
+            '사용량 데이터를 찾을 수 없',
+            '요금제를 먼저 가입',
+            '핫플레이스 탭',
+            '스토어맵',
+            '일반 채팅으로',
+            '구독 서비스 추천해주세요',
+            '기본 추천을',
+            '며칠 사용한 후',
+            '데이터가 준비되지 않은',
+            '브랜드를 못 찾겠',
+            '데이터가 없어',
+            '다시 시도해',
+            '문의해주세요',
+            '충분한 사용 데이터가',
+            '먼저 해봐',
+            '로그인이 필요한',
+            '가입하지 않았거나',
+            '혹시',
+            '어떤 도움이',
+            '무엇을 도와',
+            '처음부터',
+            '다시 시작',
+            '안녕',
+            '인사'
+        ]
+
+        if any(keyword in ai_response for keyword in guidance_keywords):
+            print(f"[DEBUG] Contains guidance keywords, no subscription recommendation")
+            return None
+
+        # AI 응답에서 구독 서비스와 브랜드 추출 (명시적으로 언급한 경우만)
         subscription_matches = re.findall(r'(리디|지니|왓챠|넷플릭스|유튜브|스포티파이|U\+모바일tv)', ai_response)
         brand_matches = re.findall(r'(교보문고|스타벅스|올리브영|CGV|롯데시네마)', ai_response)
 
+        # 추천 키워드가 있는지 확인
+        recommendation_keywords = ["추천드립니다", "추천해드릴게", "찰떡", "완전 추천", "조합", "위 조합을 추천", "이 조합 완전", "추천!", "딱 맞"]
+        has_recommendation = any(keyword in ai_response for keyword in recommendation_keywords)
+
+        # 명시적 추천이 없으면 카드 표시 안함
+        if not has_recommendation:
+            print(f"[DEBUG] No explicit recommendation keywords found")
+            return None
+
         recommended_subscriptions = []
 
-        # 1. 메인 구독 찾기
+        # 1. 메인 구독 찾기 (AI가 명시적으로 언급한 경우만)
         main_subscription = None
         if subscription_matches:
             subscription_name = subscription_matches[0]
@@ -351,27 +420,15 @@ def get_recommended_subscriptions(req: ChatRequest, ai_response: str):
                 Subscription.title.contains(subscription_name)
             ).first()
 
-        # AI가 특정 구독을 언급하지 않았다면 메시지 기반 추천
-        if not main_subscription:
-            message_lower = req.message.lower()
-            if any(word in message_lower for word in ["영화", "드라마", "TV"]):
-                main_subscription = db.query(Subscription).filter(
-                    Subscription.title.contains("넷플릭스")
-                ).first()
-            elif any(word in message_lower for word in ["음악", "노래"]):
-                main_subscription = db.query(Subscription).filter(
-                    Subscription.title.contains("지니")
-                ).first()
-            elif any(word in message_lower for word in ["스포츠", "축구", "야구"]):
-                main_subscription = db.query(Subscription).filter(
-                    Subscription.title.contains("U+모바일tv")
-                ).first()
-            else:
-                # 기본 추천 → 넷플릭스
-                main_subscription = db.query(Subscription).filter(
-                    Subscription.title.contains("넷플릭스")
-                ).first() or db.query(Subscription).first()
+        # 2. 라이프 브랜드 찾기 (AI가 명시적으로 언급한 경우만)
+        life_brand = None
+        if brand_matches:
+            brand_name = brand_matches[0]
+            life_brand = db.query(Brand).filter(
+                Brand.name.contains(brand_name)
+            ).first()
 
+        # 🔥 AI가 명시적으로 언급한 경우만 추가 (기본 추천 완전 제거)
         if main_subscription:
             recommended_subscriptions.append({
                 "id": main_subscription.id,
@@ -381,34 +438,6 @@ def get_recommended_subscriptions(req: ChatRequest, ai_response: str):
                 "price": main_subscription.price,
                 "type": "main_subscription"
             })
-
-        # 2. 라이프 브랜드 찾기
-        life_brand = None
-        if brand_matches:
-            brand_name = brand_matches[0]
-            life_brand = db.query(Brand).filter(
-                Brand.name.contains(brand_name)
-            ).first()
-
-        if not life_brand:
-            message_lower = req.message.lower()
-            if any(word in message_lower for word in ["커피", "카페", "음료"]):
-                life_brand = db.query(Brand).filter(
-                    Brand.name.contains("스타벅스")
-                ).first()
-            elif any(word in message_lower for word in ["영화", "시네마"]):
-                life_brand = db.query(Brand).filter(
-                    Brand.name.contains("CGV")
-                ).first()
-            elif any(word in message_lower for word in ["책", "독서"]):
-                life_brand = db.query(Brand).filter(
-                    Brand.name.contains("교보문고")
-                ).first()
-            else:
-                # 기본 추천 → 스타벅스
-                life_brand = db.query(Brand).filter(
-                    Brand.name.contains("스타벅스")
-                ).first() or db.query(Brand).first()
 
         if life_brand:
             recommended_subscriptions.append({
@@ -421,6 +450,7 @@ def get_recommended_subscriptions(req: ChatRequest, ai_response: str):
 
         print(f"[DEBUG] Subscription combination: main={main_subscription.title if main_subscription else None}, brand={life_brand.name if life_brand else None}")
 
+        # 🔥 실제 추천이 있을 때만 반환 (기본 추천 절대 안함)
         return recommended_subscriptions if recommended_subscriptions else None
 
     finally:
