@@ -93,7 +93,7 @@ async def chat_likes(req: LikesChatRequest):
 
         print(f"[DEBUG] Likes full AI response: '{full_ai_response[:200]}...'")
 
-        # 실제 추천이 있을 때만 구독 서비스 카드 전송 (안내 메시지는 카드 없음)
+        # 실제 추천이 있을 때만 구독 서비스 카드 전송
         recommended_subscriptions = get_recommended_subscriptions_likes(full_ai_response)
 
         if recommended_subscriptions:
