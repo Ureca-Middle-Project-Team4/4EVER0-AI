@@ -1,4 +1,4 @@
-# chatbot-server/app/api/usage.py - 완전 개선 버전
+# chatbot-server/app/api/usage.py - 완전 수정된 버전
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -83,60 +83,40 @@ def _analyze_user_type(usage_pct: float, data_gb: float, voice_min: int) -> str:
     else:
         return "라이트 사용자"
 
-def _create_fallback_usage_data(user_id: int, tone: str) -> dict:
-    """사용자 정보가 없을 때 기본 데이터 생성"""
-    return {
-        "user_id": user_id,
-        "current_plan": "기본 요금제",
-        "current_price": 35000,
-        "remaining_data": 5000,  # 5GB
-        "remaining_voice": 200,  # 200분
-        "remaining_sms": 100,    # 100건
-        "usage_percentage": 50.0  # 평균 사용률
-    }
-
-def _generate_fallback_explanation(user_id: int, recommended_plans: list, tone: str) -> str:
-    """폴백 상황에 대한 설명 생성"""
+def _generate_no_data_message(tone: str = "general") -> str:
+    """사용량 데이터가 없을 때 안내 메시지"""
     if tone == "muneoz":
-        return f"""앗! {user_id}번 사용자 정보를 못 찾았어! 😅
+        return """어? 너의 사용량 데이터를 못 찾겠어! 😅
 
-하지만 걱정 마! 인기 요금제로 추천해줄게~
+아직 요금제를 가입하지 않았거나,
+데이터가 준비되지 않은 것 같아!
 
-✅ **추천 이유:**
-• 많은 사람들이 선택한 검증된 요금제들이야!
-• 평균적인 사용 패턴에 딱 맞아!
-• 가성비 완전 럭키비키! ✨
+이런 걸 해봐:
+📱 **요금제를 먼저 가입해보고**
+📊 **며칠 사용한 후에** 다시 와줘!
 
-**🔥 1순위: {recommended_plans[0].name if recommended_plans else '너겟 30'} ({_safe_price_value(recommended_plans[0].price) if recommended_plans else 35000:,}원)**
-• 데이터도 넉넉하고 가격도 적당해!
-
-**🔥 2순위: {recommended_plans[1].name if len(recommended_plans) > 1 else '라이트 23'} ({_safe_price_value(recommended_plans[1].price) if len(recommended_plans) > 1 else 25000:,}원)**
-• 가성비 완전 찰떡이야!
-
-이 중에서 네 스타일에 맞는 거 골라봐~ 🐙💜"""
+지금은 일반 채팅으로 "요금제 추천해줘"라고 하면
+네 상황에 맞는 추천을 받을 수 있어~ 🐙💜"""
     else:
-        return f"""죄송해요, {user_id}번 사용자의 정보를 찾을 수 없어요. 😔
+        return """사용량 데이터를 찾을 수 없습니다. 😔
 
-대신 인기 요금제를 추천해드릴게요!
+다음과 같은 경우일 수 있어요:
+• 아직 요금제를 가입하지 않으신 경우
+• 가입 후 충분한 사용 데이터가 쌓이지 않은 경우
 
-✅ **추천 근거:**
-• 다수 고객이 선택한 검증된 요금제
-• 일반적인 사용 패턴에 최적화
-• 안정적인 가성비 제공
+권장사항:
+📱 **요금제 가입 후 며칠 사용해보시기**
+💬 **일반 채팅으로 "요금제 추천해주세요"**라고
+   말씀해주시면 기본 상담을 받으실 수 있어요!
 
-**💡 1순위: {recommended_plans[0].name if recommended_plans else '너겟 30'} ({_safe_price_value(recommended_plans[0].price) if recommended_plans else 35000:,}원)**
-• 적절한 데이터 용량과 합리적 가격
-
-**💡 2순위: {recommended_plans[1].name if len(recommended_plans) > 1 else '라이트 23'} ({_safe_price_value(recommended_plans[1].price) if len(recommended_plans) > 1 else 25000:,}원)**
-• 경제적이면서 기본 기능 충실
-
-위 요금제 중에서 선택하시면 만족하실 거예요! 😊"""
+사용량이 쌓인 후 다시 이용해주시면
+더 정확한 맞춤 추천을 받으실 수 있습니다. 😊"""
 
 def _generate_simple_explanation(usage, recommendation_type: str, recommended_plans: list, tone: str) -> str:
     """사용자 친화적 설명 생성 - 사용자 타입 분석 + 구체적 이익/절약 금액"""
 
     if not usage or not recommended_plans:
-        return _generate_fallback_explanation(usage.user_id if usage else 0, recommended_plans, tone)
+        return _generate_no_data_message(tone)
 
     usage_pct = usage.usage_percentage
     current_plan = usage.current_plan_name
@@ -310,52 +290,17 @@ async def usage_based_recommendation(
                 yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
                 return
 
-            # 3. 사용자 정보가 없을 때 폴백 처리
+            # 3. 사용자 정보가 없을 때 - 카드 없이 안내 메시지만
             if not user_usage:
-                print(f"[WARNING] User {user_id} not found, providing fallback recommendation")
-
-                # 기본 사용량 데이터로 폴백
-                fallback_usage_data = _create_fallback_usage_data(user_id, tone)
-
-                # 폴백 사용량 분석 결과 전송
-                usage_summary = {
-                    "type": "usage_analysis",
-                    "data": fallback_usage_data
-                }
-                yield f"data: {json.dumps(usage_summary, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.1)
-
-                # 기본 인기 요금제 추천 (상위 2개)
-                recommended_plans = all_plans[:2] if len(all_plans) >= 2 else all_plans
-
-                if recommended_plans:
-                    plan_data = {
-                        "type": "plan_recommendations",
-                        "plans": [
-                            {
-                                "id": plan.id,
-                                "name": plan.name,
-                                "price": _safe_price_value(plan.price),
-                                "data": plan.data,
-                                "voice": plan.voice,
-                                "speed": plan.speed,
-                                "share_data": plan.share_data,
-                                "sms": plan.sms,
-                                "description": plan.description
-                            }
-                            for plan in recommended_plans
-                        ]
-                    }
-                    yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.1)
+                print(f"[WARNING] User {user_id} not found, providing guidance message")
 
                 # 스트리밍 시작 신호
                 yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.05)
 
-                # 폴백 메시지 스트리밍
-                fallback_message = _generate_fallback_explanation(user_id, recommended_plans, tone)
-                words = fallback_message.split(' ')
+                # 안내 메시지 스트리밍
+                guidance_message = _generate_no_data_message(tone)
+                words = guidance_message.split(' ')
                 for i, word in enumerate(words):
                     chunk_data = {
                         "type": "message_chunk",
@@ -453,25 +398,11 @@ async def get_user_usage(user_id: int):
         user_usage = get_user_current_usage(user_id)
 
         if not user_usage:
-            # 폴백 데이터 제공
-            fallback_data = _create_fallback_usage_data(user_id, "general")
+            # 데이터가 없을 때는 404 반환
             return {
-                "success": True,
-                "message": f"사용자 {user_id}의 정보를 찾을 수 없어 기본 정보로 대체합니다.",
-                "data": {
-                    "user_id": fallback_data["user_id"],
-                    "current_plan": {
-                        "name": fallback_data["current_plan"],
-                        "price": fallback_data["current_price"]
-                    },
-                    "remaining": {
-                        "data": f"{fallback_data['remaining_data']}MB",
-                        "voice": f"{fallback_data['remaining_voice']}분",
-                        "sms": f"{fallback_data['remaining_sms']}건"
-                    },
-                    "usage_percentage": fallback_data["usage_percentage"],
-                    "status": _get_usage_status(fallback_data["usage_percentage"])
-                }
+                "success": False,
+                "message": f"사용자 {user_id}의 사용량 데이터를 찾을 수 없습니다.",
+                "data": None
             }
 
         # 응답 데이터 구성
@@ -500,25 +431,10 @@ async def get_user_usage(user_id: int):
         raise
     except Exception as e:
         print(f"[ERROR] Usage data retrieval failed: {e}")
-        # 에러 시에도 폴백 데이터 제공
-        fallback_data = _create_fallback_usage_data(user_id, "general")
         return {
             "success": False,
-            "message": f"사용량 조회 실패, 기본 데이터로 대체: {str(e)}",
-            "data": {
-                "user_id": fallback_data["user_id"],
-                "current_plan": {
-                    "name": fallback_data["current_plan"],
-                    "price": fallback_data["current_price"]
-                },
-                "remaining": {
-                    "data": f"{fallback_data['remaining_data']}MB",
-                    "voice": f"{fallback_data['remaining_voice']}분",
-                    "sms": f"{fallback_data['remaining_sms']}건"
-                },
-                "usage_percentage": fallback_data["usage_percentage"],
-                "status": _get_usage_status(fallback_data["usage_percentage"])
-            }
+            "message": f"사용량 조회 실패: {str(e)}",
+            "data": None
         }
 
 def _get_usage_status(usage_percentage: float) -> dict:
