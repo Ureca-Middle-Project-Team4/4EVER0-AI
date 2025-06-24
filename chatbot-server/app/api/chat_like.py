@@ -11,7 +11,13 @@ import re
 router = APIRouter()
 
 def get_recommended_subscriptions_likes(ai_response: str):
-    """좋아요 기반 AI 응답에서 구독 서비스 추천 정보 추출 - 타입 정확히 구분"""
+    """좋아요 기반 AI 응답에서 구독 서비스 추천 정보 추출"""
+
+    # 좋아요 안내 메시지인 경우 카드 표시 안함
+    guidance_keywords = ['핫플레이스', '스토어맵', '좋아요를', '좋아요 기반', '좋아요한 브랜드가 없']
+    if any(keyword in ai_response for keyword in guidance_keywords):
+        print(f"[DEBUG] Likes response is guidance message, no cards needed")
+        return None
 
     # 최종 추천이 아닌 경우 확인
     if not any(keyword in ai_response for keyword in ['추천', '조합', '메인 구독', '라이프 브랜드']):
@@ -25,7 +31,7 @@ def get_recommended_subscriptions_likes(ai_response: str):
 
         recommended_subscriptions = []
 
-        # 🔥 1. 메인 구독 찾기 (Subscription 테이블에서)
+        # 1. 메인 구독 찾기 (AI가 명시적으로 언급한 경우만)
         main_subscription = None
         if subscription_matches:
             subscription_name = subscription_matches[0]
@@ -33,29 +39,23 @@ def get_recommended_subscriptions_likes(ai_response: str):
                 Subscription.title.contains(subscription_name)
             ).first()
 
-        # AI가 특정 구독을 언급하지 않았다면 기본 추천
-        if not main_subscription:
-            # 기본 메인 구독 추천 (넷플릭스)
-            main_subscription = db.query(Subscription).filter(
-                Subscription.title.contains("넷플릭스")
-            ).first()
+        # AI가 특정 구독을 언급하지 않았다면 카드 표시 안함
+        # if not main_subscription:
+        #     # 기본 메인 구독 추천 제거
+        #     return None
 
-            # 넷플릭스가 없으면 첫 번째 구독 서비스
-            if not main_subscription:
-                main_subscription = db.query(Subscription).first()
-
-        # 메인 구독 추가 (type: "main_subscription")
+        # 메인 구독 추가 (AI가 명시적으로 언급한 경우만)
         if main_subscription:
             recommended_subscriptions.append({
                 "id": main_subscription.id,
-                "title": main_subscription.title,  # Subscription은 title 필드
+                "title": main_subscription.title,
                 "image_url": main_subscription.image_url,
                 "category": main_subscription.category,
                 "price": main_subscription.price,
-                "type": "main_subscription"  # 🔥 정확한 타입
+                "type": "main_subscription"
             })
 
-        # 🔥 2. 라이프 브랜드 찾기 (Brand 테이블에서)
+        # 2. 라이프 브랜드 찾기 (AI가 명시적으로 언급한 경우만)
         life_brand = None
         if brand_matches:
             brand_name = brand_matches[0]
@@ -63,29 +63,24 @@ def get_recommended_subscriptions_likes(ai_response: str):
                 Brand.name.contains(brand_name)
             ).first()
 
-        # AI가 특정 브랜드를 언급하지 않았다면 기본 추천
-        if not life_brand:
-            # 기본 라이프 브랜드 추천 (스타벅스)
-            life_brand = db.query(Brand).filter(
-                Brand.name.contains("스타벅스")
-            ).first()
+        # AI가 특정 브랜드를 언급하지 않았다면 카드 표시 안함 (기본 추천 제거)
+        # if not life_brand:
+        #     # 기본 라이프 브랜드 추천 제거
+        #     return None
 
-            # 스타벅스가 없으면 첫 번째 브랜드
-            if not life_brand:
-                life_brand = db.query(Brand).first()
-
-        # 라이프 브랜드 추가 (type: "life_brand")
+        # 라이프 브랜드 추가 (AI가 명시적으로 언급한 경우만)
         if life_brand:
             recommended_subscriptions.append({
                 "id": life_brand.id,
-                "name": life_brand.name,  # Brand는 name 필드
+                "name": life_brand.name,
                 "image_url": life_brand.image_url,
                 "description": life_brand.description,
-                "type": "life_brand"  # 🔥 정확한 타입
+                "type": "life_brand"
             })
 
         print(f"[DEBUG] Likes combination: main={main_subscription.title if main_subscription else None}, brand={life_brand.name if life_brand else None}")
 
+        # 실제 추천이 있을 때만 카드 반환
         return recommended_subscriptions if recommended_subscriptions else None
 
     finally:
@@ -107,7 +102,7 @@ async def chat_likes(req: LikesChatRequest):
 
         print(f"[DEBUG] Likes full AI response: '{full_ai_response[:200]}...'")
 
-        # 3. 구독 서비스 추천이 있으면 DB에서 조회해서 먼저 전송
+        # 실제 추천이 있을 때만 구독 서비스 카드 전송 (안내 메시지는 카드 없음)
         recommended_subscriptions = get_recommended_subscriptions_likes(full_ai_response)
 
         if recommended_subscriptions:
@@ -122,6 +117,8 @@ async def chat_likes(req: LikesChatRequest):
 
             yield f"data: {json.dumps(subscription_data, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.1)
+        else:
+            print(f"[DEBUG] No subscription cards needed (guidance message or no explicit recommendations)")
 
         # 4. 스트리밍 시작 신호
         yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
