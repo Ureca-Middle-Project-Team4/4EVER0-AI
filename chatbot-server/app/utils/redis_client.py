@@ -13,25 +13,32 @@ MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
 print(f"[DEBUG] Redis 설정: {redis_host}:{redis_port} / TTL={SESSION_TTL}s")
 
 def create_redis_client():
-    try:
-        client = redis.Redis(
-            host=redis_host,
-            port=redis_port,
-            decode_responses=True,
-            socket_connect_timeout=3,
-            socket_timeout=3,
-        )
+    """Redis 클라이언트 생성 - 실패 시 localhost로 fallback"""
+    for host in [redis_host, "localhost"]:
         try:
-            client.config_set('maxmemory', f'{MEMORY_LIMIT_MB}mb')
-            client.config_set('maxmemory-policy', 'allkeys-lru')
-            print(f"[INFO] Redis 메모리 정책 설정 완료: {MEMORY_LIMIT_MB}MB")
+            client = redis.Redis(
+                host=host,
+                port=redis_port,
+                decode_responses=True,
+                socket_connect_timeout=3,
+                socket_timeout=3,
+            )
+            client.ping()  # 연결 확인
+
+            # Redis 메모리 설정
+            try:
+                client.config_set('maxmemory', f'{MEMORY_LIMIT_MB}mb')
+                client.config_set('maxmemory-policy', 'allkeys-lru')
+                print(f"[INFO] Redis 메모리 정책 설정 완료: {MEMORY_LIMIT_MB}MB")
+            except Exception as e:
+                print(f"[WARNING] Redis 설정 실패: {e}")
+
+            print(f"[SUCCESS] Redis 연결 성공: {host}:{redis_port}")
+            return client
         except Exception as e:
-            print(f"[WARNING] Redis 설정 실패: {e}")
-        client.ping()
-        return client
-    except Exception as e:
-        print(f"[ERROR] Redis 연결 실패: {e}")
-        return None
+            print(f"[ERROR] Redis 연결 실패 ({host}): {e}")
+    return None
+
 
 client = create_redis_client()
 
