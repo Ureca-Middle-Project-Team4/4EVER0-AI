@@ -1,3 +1,5 @@
+# chatbot-server/app/services/handle_chat_likes.py - 수정된 버전
+
 from app.schemas.chat import LikesChatRequest
 from app.db.coupon_like_db import get_liked_brand_ids
 from app.db.subscription_db import get_products_from_db
@@ -22,23 +24,28 @@ async def handle_chat_likes(req: LikesChatRequest):
             if tone == "muneoz":
                 guidance_msg = """앗! 좋아요한 브랜드가 없네! 😅
 
-좋아요 기반 추천을 받으려면:
-📍 **핫플레이스 탭 > 스토어맵**에서
-좋아하는 브랜드에 💜 좋아요를 눌러봐!
+우선 이런 걸 해봐:
+📍 **핫플레이스 탭**에서 스토어맵 구경하고
+💜 좋아하는 브랜드에 좋아요를 눌러봐!
 
-그래야 네 취향에 딱 맞는 조합을 추천해줄 수 있어~ 🐙✨
+그러면 완전 찰떡인 구독 추천을 해줄 수 있어~ 🐙✨
 
-좋아요를 누르고 다시 와줘! 🤟"""
+아니면 일반 상담으로 "구독 추천해줘"라고 말해도 돼! 💜"""
             else:
-                guidance_msg = """좋아요한 브랜드가 없어서 추천을 드릴 수 없어요. 😔
+                guidance_msg = """좋아요한 브랜드가 없어서 맞춤 추천을 드릴 수 없어요. 😔
 
-좋아요 기반 맞춤 추천을 받으시려면:
+다음과 같이 해보시면 좋을 것 같아요:
+
 📍 **핫플레이스 탭 > 스토어맵**에서
-관심있는 브랜드에 좋아요를 눌러주세요!
+   관심있는 브랜드에 좋아요를 눌러주세요!
+
+💬 또는 일반 채팅으로 **"구독 서비스 추천해주세요"**라고
+   말씀해주시면 기본 추천을 받으실 수 있어요!
 
 좋아요를 하신 후 다시 이용해주시면
 취향에 맞는 개인화된 추천을 받으실 수 있습니다. 😊"""
 
+            # 단어별로 스트리밍
             words = guidance_msg.split(' ')
             for i, word in enumerate(words):
                 yield word + (" " if i < len(words) - 1 else "")
@@ -64,12 +71,19 @@ async def handle_chat_likes(req: LikesChatRequest):
 **핫플레이스 탭 > 스토어맵**에서
 다시 한 번 💜 좋아요를 눌러봐!
 
-그래도 안 되면 관리자에게 문의해줘~ 🐙"""
+아니면 일반 채팅으로 "구독 추천해줘"라고 하면
+기본 추천을 받을 수 있어~ 🐙💜"""
             else:
                 error_msg = """좋아요하신 브랜드 정보를 찾을 수 없어요. 😔
 
-**핫플레이스 탭 > 스토어맵**에서
-브랜드 좋아요를 다시 확인해주시거나,
+다음과 같이 해보세요:
+
+📍 **핫플레이스 탭 > 스토어맵**에서
+   브랜드 좋아요를 다시 확인해주세요
+
+💬 또는 일반 채팅으로 **"구독 서비스 추천해주세요"**라고
+   말씀해주시면 기본 추천을 받으실 수 있어요!
+
 문제가 지속되면 고객센터로 문의해주세요."""
 
             words = error_msg.split(' ')
@@ -85,10 +99,14 @@ async def handle_chat_likes(req: LikesChatRequest):
         async def no_subscription_streamer():
             if tone == "muneoz":
                 error_msg = """앗! 구독 서비스 데이터가 없어! 😅
-관리자에게 문의해줘~ 🐙💜"""
+
+일반 채팅으로 "구독 추천해줘"라고 해봐~
+아니면 관리자에게 문의해줘! 🐙💜"""
             else:
                 error_msg = """구독 서비스 데이터를 불러올 수 없어요. 😔
-잠시 후 다시 시도해주세요!"""
+
+일반 채팅으로 **"구독 서비스 추천해주세요"**라고
+말씀해주시거나, 잠시 후 다시 시도해주세요!"""
 
             words = error_msg.split(' ')
             for i, word in enumerate(words):
@@ -117,9 +135,14 @@ async def handle_chat_likes(req: LikesChatRequest):
 
         async def prompt_error_streamer():
             if tone == "muneoz":
-                error_msg = "앗! 프롬프트 만드는 중에 문제가 생겼어! 😵‍💫\n다시 시도해봐~ 🤟"
+                error_msg = """앗! 프롬프트 만드는 중에 문제가 생겼어! 😵‍💫
+
+일반 채팅으로 "구독 추천해줘"라고 다시 시도해봐~ 🤟"""
             else:
-                error_msg = "추천 준비 중 오류가 발생했어요. 😔\n다시 시도해주세요!"
+                error_msg = """추천 준비 중 오류가 발생했어요. 😔
+
+일반 채팅으로 **"구독 서비스 추천해주세요"**라고
+다시 시도해주세요!"""
 
             words = error_msg.split(' ')
             for i, word in enumerate(words):
@@ -139,8 +162,13 @@ async def handle_chat_likes(req: LikesChatRequest):
             print(f"[ERROR] AI streaming failed: {e}")
             # 에러 발생 시 기본 메시지
             if tone == "muneoz":
-                yield "앗! AI가 삐끗했나봐! 😅\n다시 시도해줘~ 🐙💜"
+                yield """앗! AI가 삐끗했나봐! 😅
+
+일반 채팅으로 "구독 추천해줘"라고 다시 시도해봐~ 🐙💜"""
             else:
-                yield "AI 응답 생성 중 오류가 발생했어요. 😔\n잠시 후 다시 시도해주세요!"
+                yield """AI 응답 생성 중 오류가 발생했어요. 😔
+
+일반 채팅으로 **"구독 서비스 추천해주세요"**라고
+다시 시도해주세요!"""
 
     return streamer

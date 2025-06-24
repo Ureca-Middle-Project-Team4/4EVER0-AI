@@ -1,3 +1,5 @@
+# chatbot-server/app/api/chat_like.py - 수정된 버전
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from app.schemas.chat import LikesChatRequest
@@ -14,7 +16,13 @@ def get_recommended_subscriptions_likes(ai_response: str):
     """좋아요 기반 AI 응답에서 구독 서비스 추천 정보 추출"""
 
     # 좋아요 안내 메시지인 경우 카드 표시 안함
-    guidance_keywords = ['핫플레이스', '스토어맵', '좋아요를', '좋아요 기반', '좋아요한 브랜드가 없']
+    guidance_keywords = [
+        '핫플레이스', '스토어맵', '좋아요를', '좋아요 기반', '좋아요한 브랜드가 없',
+        '좋아요한 브랜드가 없어서', '맞춤 추천을 드릴 수 없', '일반 채팅으로',
+        '구독 서비스 추천해주세요', '기본 추천을', '먼저 가입해보고',
+        '브랜드를 못 찾겠', '데이터가 없어', '다시 시도해', '문의해주세요'
+    ]
+
     if any(keyword in ai_response for keyword in guidance_keywords):
         print(f"[DEBUG] Likes response is guidance message, no cards needed")
         return None
@@ -39,11 +47,6 @@ def get_recommended_subscriptions_likes(ai_response: str):
                 Subscription.title.contains(subscription_name)
             ).first()
 
-        # AI가 특정 구독을 언급하지 않았다면 카드 표시 안함
-        # if not main_subscription:
-        #     # 기본 메인 구독 추천 제거
-        #     return None
-
         # 메인 구독 추가 (AI가 명시적으로 언급한 경우만)
         if main_subscription:
             recommended_subscriptions.append({
@@ -62,11 +65,6 @@ def get_recommended_subscriptions_likes(ai_response: str):
             life_brand = db.query(Brand).filter(
                 Brand.name.contains(brand_name)
             ).first()
-
-        # AI가 특정 브랜드를 언급하지 않았다면 카드 표시 안함 (기본 추천 제거)
-        # if not life_brand:
-        #     # 기본 라이프 브랜드 추천 제거
-        #     return None
 
         # 라이프 브랜드 추가 (AI가 명시적으로 언급한 경우만)
         if life_brand:
