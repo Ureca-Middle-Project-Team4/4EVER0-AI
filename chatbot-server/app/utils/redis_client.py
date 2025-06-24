@@ -106,3 +106,32 @@ def cleanup_old_sessions():
                 print(f"[DEBUG] {len(keys_to_delete)}개 세션 삭제 완료")
     except Exception as e:
         print(f"[ERROR] 세션 정리 실패: {e}")
+
+def get_redis_memory_info():
+    """Redis 메모리 사용량 정보"""
+    if not client:
+        return {"error": "Redis 연결 없음"}
+
+    try:
+        info = client.info('memory')
+        return {
+            "used_memory_human": info.get('used_memory_human'),
+            "used_memory_peak_human": info.get('used_memory_peak_human'),
+            "maxmemory_human": info.get('maxmemory_human', 'unlimited'),
+            "total_keys": client.dbsize()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+def emergency_cleanup():
+    """긴급 메모리 정리 - 모든 세션 삭제"""
+    if not client:
+        return False
+
+    try:
+        client.flushdb()
+        print("[WARNING] 긴급 메모리 정리 - 모든 세션 삭제됨")
+        return True
+    except Exception as e:
+        print(f"[ERROR] 긴급 정리 실패: {e}")
+        return False
