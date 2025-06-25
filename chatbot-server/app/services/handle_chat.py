@@ -39,6 +39,7 @@ async def handle_chat(req: ChatRequest):
     # 현재 멀티턴 상태 확인
     phone_plan_step = session.get("phone_plan_flow_step", 0)
     subscription_step = session.get("subscription_flow_step", 0)
+    ubti_step = session.get("ubti_step", 0)
 
     print(f"[DEBUG] Multiturn status - phone_plan: {phone_plan_step}, subscription: {subscription_step}")
 
@@ -63,7 +64,7 @@ async def handle_chat(req: ChatRequest):
             _reset_multiturn_session(session, req.session_id, "subscription")
             return create_simple_stream("구독 서비스 질문 중 오류가 발생했어요. 처음부터 다시 시작해주세요! 😅")
 
-    # 🔥 새로운 대화 - AI 기반 인텐트 감지 (컨텍스트 포함)
+    # 새로운 대화 - AI 기반 인텐트 감지 (컨텍스트 포함)
     print(f"[DEBUG] >>> STARTING NEW CONVERSATION - DETECTING INTENT <<<")
     try:
         # 세션 컨텍스트를 인텐트 분류에 전달
@@ -144,23 +145,7 @@ async def handle_chat(req: ChatRequest):
         # UBTI
         elif intent == "ubti":
             print(f"[DEBUG] >>> HANDLING UBTI <<<")
-            if tone == "muneoz":
-                response_text = """오오! UBTI 하고 싶구나? 🎯
-
-UBTI는 별도 API에서 진행해야 해!
-'타코시그널 분석받기' 버튼을 누르면
-4단계 질문 받고 완전 찰떡인 타입 알려줄 수 있어~ 🐙
-
-지금은 요금제나 구독 추천 얘기할까? 💜"""
-            else:
-                response_text = """UBTI 성향 분석에 관심 있으시군요! 🎯
-
-UBTI는 전용 API를 통해 진행됩니다!
-타코시그널 검사 버튼 눌러보세요!
-
-현재는 요금제나 구독 서비스 상담을 도와드릴 수 있어요.
-어떤 도움이 필요하신가요? 😊"""
-            return create_simple_stream(response_text)
+            return await get_multi_turn_chain(req, "ubti", tone)
 
         # 기본 케이스 - 인사나 일반적인 대화
         else:
@@ -204,6 +189,9 @@ def _migrate_session_keys(session: dict, session_id: str):
         session["subscription_flow_step"] = session.pop("subscription_step")
         if "subscription_info" in session:
             session["user_info"] = session.pop("subscription_info")
+        migrated = True
+    if "ubti_step" not in session and "ubti_info" in session:
+        session["ubti_step"] = 1
         migrated = True
 
     # 마이그레이션이 발생했으면 저장

@@ -20,6 +20,7 @@ class Brand(Base):
     name = Column(String(100), nullable=False)
     image_url = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
+    category = Column(String(100), nullable=False)
 
 class Plan(Base):
     __tablename__ = "plans"

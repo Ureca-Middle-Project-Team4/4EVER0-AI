@@ -8,6 +8,7 @@ from app.prompts.ubti_prompt import get_ubti_prompt
 from app.db.ubti_types_db import get_all_ubti_types
 from app.db.plan_db import get_all_plans
 from app.db.subscription_db import get_products_from_db
+from app.db.brand_db import get_life_brands_from_db
 from app.utils.langchain_client import get_chat_model
 import json
 from fastapi.responses import JSONResponse
@@ -78,7 +79,9 @@ async def next_question(req: UBTIRequest):
         if req.message is not None:
             session["answers"].append(req.message)
             session["step"] += 1
+            session["ubti_step"] = session["step"]
             save_session(session_id, session)
+
 
         step = session["step"]
 
@@ -120,8 +123,11 @@ async def final_result(req: UBTIRequest):
     ubti_types = get_all_ubti_types()
     plans = get_all_plans()
     subscriptions = get_products_from_db()
+    brands = get_life_brands_from_db()
+    if not brands:
+        raise HTTPException(500, detail="브랜드 데이터를 찾을 수 없습니다")
 
-    # 🔥 ID 포함하여 포맷팅
+    # ID 포함하여 포맷팅
     subs_text = "\n".join([
         f"- ID: {s.id}, {s.title}: {s.category} - {s.price}원" for s in subscriptions
     ])
@@ -130,11 +136,17 @@ async def final_result(req: UBTIRequest):
         f"- ID: {p.id}, {p.name}: {p.price}원 / {p.data} / {p.voice}" for p in plans
     ])
 
+    brands_text = "\n".join([
+        f"- ID: {b.id}, {b.name} ({b.category})" for b in brands
+    ])
+
+
     prompt = get_ubti_prompt().format(
         message="\n".join(session["answers"]),
         ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),
         plans=plans_text,
-        subscriptions=subs_text
+        subscriptions=subs_text,
+        brands="\n".join(f"- ID: {b.id}, {b.name}: {b.category}" for b in brands)
     )
 
     # 2. AI 응답 수집
@@ -157,7 +169,7 @@ async def final_result(req: UBTIRequest):
         parsed_result = add_missing_image_urls(parsed_result)
 
         # 5. ID 검증
-        validate_ubti_response_ids(parsed_result, plans, subscriptions)
+        validate_ubti_response_ids(parsed_result, plans, subscriptions, brands)
 
         # 6. UBTIResult 스키마에 맞게 데이터 구성
         result_data = UBTIResult(**parsed_result)
@@ -206,19 +218,20 @@ def add_missing_image_urls(parsed_result: dict) -> dict:
         print(f"[ERROR] Failed to add image_url fields: {e}")
         return parsed_result
 
-def validate_ubti_response_ids(parsed_result: dict, plans: list, subscriptions: list):
+def validate_ubti_response_ids(parsed_result: dict, plans: list, subscriptions: list, brands: list):
     """UBTI 응답의 ID 유효성 검증"""
 
     # 유효한 ID 목록 생성
     valid_plan_ids = {p.id for p in plans}
     valid_subscription_ids = {s.id for s in subscriptions}
+    valid_brand_ids = {b.id for b in brands}
 
-    # plans 검증 (2개여야 함)
     if "recommendation" not in parsed_result:
         raise ValueError("recommendation 필드가 없습니다")
-
     if "plans" not in parsed_result["recommendation"]:
         raise ValueError("plans 필드가 없습니다")
+    if "brand" not in parsed_result["recommendation"]:
+            raise ValueError("brand 필드가 없습니다")
 
     plans_data = parsed_result["recommendation"]["plans"]
     if not isinstance(plans_data, list) or len(plans_data) != 2:
@@ -241,4 +254,10 @@ def validate_ubti_response_ids(parsed_result: dict, plans: list, subscriptions: 
     if subscription_data["id"] not in valid_subscription_ids:
         raise ValueError(f"subscription의 id {subscription_data['id']}가 유효하지 않습니다")
 
-    print(f"[DEBUG] ID 검증 완료 - Plans: {[p['id'] for p in plans_data]}, Subscription: {subscription_data['id']}")
+    brand_data = parsed_result["recommendation"]["brand"]
+    if "id" not in brand_data:
+        raise ValueError("brand에 id가 없습니다")
+    if brand_data["id"] not in valid_brand_ids:
+        raise ValueError(f"brand의 id {brand_data['id']}가 유효하지 않습니다")
+
+    print(f"[DEBUG] ID 검증 완료 - Plans: {[p['id'] for p in plans_data]}, Subscription: {subscription_data['id']}, Brand: {brand_data['id']}")

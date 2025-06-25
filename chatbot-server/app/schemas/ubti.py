@@ -6,9 +6,17 @@ class PlanOrSubscription(BaseModel):
     name: str
     description: str
 
+class BrandItem(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    category: Optional[str] = None
+
 class Recommendation(BaseModel):
     plans: List[PlanOrSubscription]  # 요금제 2개 각각 ID 포함
     subscription: PlanOrSubscription  # 구독 서비스 ID 포함
+    brand: BrandItem
 
 class MatchingType(BaseModel):
     id: int

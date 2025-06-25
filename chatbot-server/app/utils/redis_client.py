@@ -49,7 +49,8 @@ def clean_session_data(data: dict) -> dict:
         'user_info', 'history',
         'plan_step', 'subscription_step',
         'plan_info', 'subscription_info',
-        'last_recommendation_type'
+        'ubti_step', 'ubti_info',
+        'step', 'answers'
     }
     cleaned = {}
     for k, v in data.items():

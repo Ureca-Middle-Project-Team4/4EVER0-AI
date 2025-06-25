@@ -5,6 +5,7 @@ from app.utils.redis_client import get_session, save_session
 from app.db.plan_db import get_all_plans
 from app.db.subscription_db import get_products_from_db
 from app.db.brand_db import get_life_brands_from_db
+
 from app.utils.langchain_client import get_chat_model
 from langchain_core.output_parsers import StrOutputParser
 from app.schemas.chat import ChatRequest
@@ -41,6 +42,14 @@ SUBSCRIPTION_FLOW = {
         ("preference", "좋아하는 장르나 특별히 관심있는 브랜드 있어? 💜\n\n(예: 액션, 로맨스, 특정 채널)")
     ]
 }
+
+UBTI_FLOW = [
+    ("situation", "어떤 상황에서 제일 활발하게 활동하시나요? (예: 출근길, 저녁시간, 주말 등)"),
+    ("hobby", "어떤 활동이나 취미를 가장 즐기시나요? (예: 드라마, 운동, 독서 등)"),
+    ("preference", "서비스를 고를 때 가장 중요한 요소는 무엇인가요? (예: 가격, 속도, 브랜드 등)"),
+    ("style", "선호하는 소통 스타일은 어떤가요? (예: 빠른 응답, 여유로운 대화 등)")
+]
+
 
 def create_simple_stream(text: str):
     """간단한 텍스트를 스트리밍으로 변환"""
@@ -361,12 +370,20 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "gener
             step_key = "phone_plan_flow_step"
             user_info_key = "user_info"
             print(f"[DEBUG] Selected PHONE_PLAN_FLOW for tone '{tone}'")
+
         elif intent == "subscription_multi":
             question_flow = SUBSCRIPTION_FLOW.get(tone, SUBSCRIPTION_FLOW["general"])
             step_key = "subscription_flow_step"
             user_info_key = "user_info"
             print(f"[DEBUG] Selected SUBSCRIPTION_FLOW for tone '{tone}'")
+
+        elif intent == "ubti":
+            question_flow = UBTI_FLOW
+            step_key = "ubti_step"
+            user_info_key = "ubti_info"
+            print(f"[DEBUG] Selected UBTI_FLOW")
         else:
+            # fallback to default phone plan
             question_flow = PHONE_PLAN_FLOW.get(tone, PHONE_PLAN_FLOW["general"])
             step_key = "phone_plan_flow_step"
             user_info_key = "user_info"
@@ -456,6 +473,9 @@ async def get_multi_turn_chain(req: ChatRequest, intent: str, tone: str = "gener
                 elif intent == "subscription_multi":
                     print(f"[DEBUG] Calling get_final_subscription_recommendation")
                     return await get_final_subscription_recommendation(req, user_info, tone)
+                elif intent == "ubti":
+                    print(f"[DEBUG] Calling get_final_ubti_result")
+                    return await get_final_ubti_result(req, user_info, tone)
 
         # 플로우 완료 후 추가 메시지 처리
         else:
@@ -629,3 +649,60 @@ async def get_final_subscription_recommendation(req: ChatRequest, user_info: dic
         print(f"[ERROR] Final subscription recommendation setup failed: {e}")
         error_text = "구독 서비스 추천 준비 중 문제가 발생했어요. 😅"
         return create_simple_stream(error_text)
+
+async def get_final_ubti_result(req: ChatRequest, user_info: dict, tone: str = "general"):
+    print(f"[DEBUG] get_final_ubti_result - tone: {tone}")
+    print(f"[DEBUG] user_info: {user_info}")
+
+    try:
+        session = get_session(req.session_id)
+
+        # UBTI 프롬프트 준비
+        from app.prompts.ubti_prompt import UBTI_PROMPT
+        prompt_template = UBTI_PROMPT[tone]
+
+        message = "\n".join([f"- {k}: {v}" for k, v in user_info.items()])
+
+        # 데이터 준비
+        ubti_types = get_all_ubti_types()
+        plans = get_all_plans()
+        subscriptions = get_products_from_db()
+        brands = get_life_brands_from_db()
+
+        plans_text = "\n".join([f"- ID: {p.id}, {p.name}: {p.price}원 / {p.data} / {p.voice}" for p in plans])
+        subs_text = "\n".join([f"- ID: {s.id}, {s.title}: {s.category} - {s.price}원" for s in subscriptions])
+
+        prompt_text = prompt_template.format(
+            message=message,
+            ubti_types="\n".join(f"{u.emoji} {u.code} - {u.name}" for u in ubti_types),
+            plans=plans_text,
+            subscriptions=subs_text
+        )
+
+        model = get_chat_model()
+
+        async def stream():
+            result_text = ""
+            try:
+                async for chunk in model.astream(prompt_text):
+                    if chunk and hasattr(chunk, 'content') and chunk.content:
+                        result_text += chunk.content
+                        yield chunk.content
+                        await asyncio.sleep(0.01)
+
+                # 세션 정리
+                session["history"].append({"role": "assistant", "content": result_text})
+                session["last_recommendation_type"] = "ubti"
+                session.pop("ubti_step", None)
+                session.pop("ubti_info", None)
+                save_session(req.session_id, session)
+
+            except Exception as e:
+                print(f"[ERROR] UBTI final recommendation failed: {e}")
+                yield "UBTI 추천 중 오류가 발생했어요. 😢"
+
+        return stream
+
+    except Exception as e:
+        print(f"[ERROR] get_final_ubti_result setup failed: {e}")
+        return create_simple_stream("UBTI 추천을 준비하는 중 오류가 발생했어요.")
