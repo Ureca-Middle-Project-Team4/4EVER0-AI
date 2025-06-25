@@ -14,12 +14,10 @@ import re
 router = APIRouter()
 
 def is_plan_recommendation(ai_response: str) -> bool:
-    """AI 응답이 요금제 추천인지 판단 - 강화된 버전"""
-
+    """AI 응답이 요금제 추천인지 판단"""
     # 구독 서비스 키워드가 있으면 요금제가 아님
     subscription_keywords = ["구독", "메인 구독", "라이프 브랜드", "조합", "넷플릭스", "유튜브", "스타벅스", "OTT"]
     if any(keyword in ai_response for keyword in subscription_keywords):
-        print(f"[DEBUG] Contains subscription keywords, not a plan recommendation")
         return False
 
     # 요금제 관련 키워드 확인
@@ -29,55 +27,79 @@ def is_plan_recommendation(ai_response: str) -> bool:
     has_plan_keywords = any(keyword in ai_response for keyword in plan_keywords)
     has_recommendation_keywords = any(keyword in ai_response for keyword in recommendation_keywords)
 
-    result = has_plan_keywords and has_recommendation_keywords
-    print(f"[DEBUG] is_plan_recommendation: {result} (plan: {has_plan_keywords}, rec: {has_recommendation_keywords})")
-    return result
+    return has_plan_keywords and has_recommendation_keywords
 
 def is_subscription_recommendation(ai_response: str) -> bool:
-    """AI 응답이 구독 서비스 추천인지 판단 - 강화된 버전"""
+    """AI 응답이 구독 서비스 추천인지 판단 - chat_likes 방식 적용"""
 
-    # 요금제 키워드가 있으면 구독 서비스가 아님
-    plan_keywords = ["요금제", "너겟", "라이트", "프리미엄", "플랜", "통신비", "GB", "데이터", "통화"]
-    if any(keyword in ai_response for keyword in plan_keywords):
-        print(f"[DEBUG] Contains plan keywords, not a subscription recommendation")
-        return False
-
-    # 🔥 안내 메시지 키워드가 있으면 추천이 아님
+    # 안내 메시지인 경우 카드 표시 안함
     guidance_keywords = [
-        '좋아요한 브랜드가 없',
-        '사용량 데이터를 찾을 수 없',
-        '요금제를 먼저 가입',
-        '핫플레이스 탭',
-        '스토어맵',
-        '일반 채팅으로',
-        '구독 서비스 추천해주세요',
-        '기본 추천을',
-        '며칠 사용한 후',
-        '데이터가 준비되지 않은',
-        '브랜드를 못 찾겠',
-        '데이터가 없어',
-        '다시 시도해',
-        '문의해주세요',
-        '충분한 사용 데이터가',
-        '먼저 해봐',
-        '로그인이 필요한',
-        '가입하지 않았거나'
+        '핫플레이스', '스토어맵', '좋아요를', '좋아요 기반', '좋아요한 브랜드가 없',
+        '좋아요한 브랜드가 없어서', '맞춤 추천을 드릴 수 없', '일반 채팅으로',
+        '구독 서비스 추천해주세요', '기본 추천을', '먼저 가입해보고',
+        '브랜드를 못 찾겠', '데이터가 없어', '다시 시도해', '문의해주세요'
     ]
-
     if any(keyword in ai_response for keyword in guidance_keywords):
-        print(f"[DEBUG] Contains guidance keywords, not a subscription recommendation")
+        print(f"[DEBUG] Contains guidance keywords, no subscription recommendation")
         return False
 
-    # 구독 서비스 관련 키워드 확인
-    subscription_keywords = ["구독", "메인 구독", "라이프 브랜드", "조합", "넷플릭스", "유튜브", "스타벅스", "OTT"]
-    recommendation_keywords = ["추천드립니다", "추천해드릴게", "찰떡", "완전 추천", "조합", "위 조합을 추천", "이 조합 완전", "추천!", "딱 맞"]
+    # 추천 키워드 없으면 제외
+    if not any(keyword in ai_response for keyword in ['추천', '조합', '메인 구독', '라이프 브랜드']):
+        print(f"[DEBUG] No recommendation keywords found")
+        return False
 
-    has_sub_keywords = any(keyword in ai_response for keyword in subscription_keywords)
-    has_recommendation_keywords = any(keyword in ai_response for keyword in recommendation_keywords)
+    return True
 
-    result = has_sub_keywords and has_recommendation_keywords
-    print(f"[DEBUG] is_subscription_recommendation: {result} (sub: {has_sub_keywords}, rec: {has_recommendation_keywords})")
-    return result
+def get_recommended_subscriptions_general(ai_response: str):
+    """일반 채팅에서 구독 서비스 추천 정보 추출 - chat_likes 방식 적용"""
+
+    db = SessionLocal()
+    try:
+        print(f"[DEBUG] get_recommended_subscriptions_general - analyzing: {ai_response[:200]}...")
+
+        ai_text = ai_response.lower().replace(" ", "")
+        recommended_subscriptions = []
+
+        # 1. 전체 구독 서비스에서 title로 포함 여부 확인
+        all_subs = db.query(Subscription).all()
+        main_subscription = next(
+            (s for s in all_subs if s.title and s.title.lower().replace(" ", "") in ai_text),
+            None
+        )
+
+        if main_subscription:
+            recommended_subscriptions.append({
+                "id": main_subscription.id,
+                "title": main_subscription.title,
+                "image_url": main_subscription.image_url,
+                "category": main_subscription.category,
+                "price": main_subscription.price,
+                "type": "main_subscription"
+            })
+
+        # 2. 전체 브랜드에서 name 포함 여부 확인
+        all_brands = db.query(Brand).all()
+        life_brand = next(
+            (b for b in all_brands if b.name and b.name.lower().replace(" ", "") in ai_text),
+            None
+        )
+
+        if life_brand:
+            recommended_subscriptions.append({
+                "id": life_brand.id,
+                "name": life_brand.name,
+                "image_url": life_brand.image_url,
+                "description": life_brand.description,
+                "type": "life_brand"
+            })
+
+        print(f"[DEBUG] General combination: main={main_subscription.title if main_subscription else None}, brand={life_brand.name if life_brand else None}")
+
+        return recommended_subscriptions if recommended_subscriptions else None
+
+    finally:
+        db.close()
+
 
 def extract_budget_from_text(text: str) -> tuple[int, int]:
     """텍스트에서 예산 범위 추출 - 개선된 한국어 처리"""
@@ -464,11 +486,9 @@ async def chat(req: ChatRequest):
 
         # 2. AI 응답을 모두 수집해서 분석
         full_ai_response = ""
-        ai_chunks = []
 
         async for chunk in ai_stream_fn():
             full_ai_response += chunk
-            ai_chunks.append(chunk)
 
         print(f"[DEBUG] Full AI response collected: '{full_ai_response[:200]}...'")
 
@@ -505,26 +525,31 @@ async def chat(req: ChatRequest):
                 yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.1)
 
-        # 5. 구독 서비스 추천 확인 및 전송 (요금제와 완전 분리)
+        # 5. 구독 서비스 추천 확인 및 전송
         elif (last_recommendation_type == "subscription" or is_subscription_recommendation(full_ai_response)):
             print(f"[DEBUG] >>> SENDING SUBSCRIPTION RECOMMENDATIONS <<<")
-            recommended_subscriptions = get_recommended_subscriptions(req, full_ai_response)
+            recommended_subscriptions = get_recommended_subscriptions_general(full_ai_response)
 
             if recommended_subscriptions:
                 subscription_data = {
                     "type": "subscription_recommendations",
                     "subscriptions": recommended_subscriptions
                 }
-                print(f"[DEBUG] Sending subscription recommendations: {len(recommended_subscriptions)} items")
+                print(f"[DEBUG] Sending general subscription recommendations: {len(recommended_subscriptions)} items")
+                # 각 항목의 타입 확인
+                for item in recommended_subscriptions:
+                    print(f"[DEBUG] Item: {item.get('title') or item.get('name')} - Type: {item['type']}")
+
                 yield f"data: {json.dumps(subscription_data, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.1)
+            else:
+                print(f"[DEBUG] No subscription recommendations to send")
 
         # 6. 스트리밍 시작 신호
         yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
         await asyncio.sleep(0.05)
 
-        # 7. 전체 응답을 단어 단위로 자연스럽게 스트리밍 (마크다운 파싱 지원)
-        # 줄바꿈 처리
+        # 7. 전체 응답을 단어 단위로 자연스럽게 스트리밍
         formatted_response = full_ai_response.replace('\\n', '\n')
         words = formatted_response.split()
 
@@ -534,7 +559,7 @@ async def chat(req: ChatRequest):
                 "content": word + (" " if i < len(words) - 1 else "")
             }
             yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.04)  # 조금 더 빠르게
+            await asyncio.sleep(0.05)
 
         # 8. 스트리밍 완료 신호
         yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"
