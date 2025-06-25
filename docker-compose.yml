@@ -11,6 +11,8 @@ services:
       - redis-ai
       - mysql
     restart: always
+    networks:
+      - 4ever0_net
 
   redis-ai:
     image: redis:7
@@ -20,6 +22,8 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - 4ever0_net
 
   mysql:
     image: mysql:8
@@ -31,7 +35,13 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - 4ever0_net
 
 volumes:
   redis_data:
   mysql_data:
+
+networks:
+  4ever0_net:
+    external: true
