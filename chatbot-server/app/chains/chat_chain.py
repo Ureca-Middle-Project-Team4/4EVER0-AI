@@ -706,3 +706,132 @@ async def get_final_ubti_result(req: ChatRequest, user_info: dict, tone: str = "
     except Exception as e:
         print(f"[ERROR] get_final_ubti_result setup failed: {e}")
         return create_simple_stream("UBTI 추천을 준비하는 중 오류가 발생했어요.")
+
+def smart_subscription_recommendation(user_info: dict, subscriptions: list, brands: list) -> dict:
+    """사용자 정보 기반 스마트 구독 서비스 추천"""
+
+    content_type = user_info.get('content_type', '').lower()
+    preference = user_info.get('preference', '').lower()
+
+    recommended_subscription = None
+    recommended_brand = None
+
+    # 메인 구독 추천 로직
+    for sub in subscriptions:
+        sub_title = sub.title.lower()
+        sub_category = sub.category.lower()
+
+        # 콘텐츠 타입별 매칭
+        if any(word in content_type for word in ['드라마', '영화']):
+            if any(word in sub_title for word in ['넷플릭스', '웨이브', 'u+모바일']):
+                recommended_subscription = sub
+                break
+        elif any(word in content_type for word in ['음악', '노래']):
+            if any(word in sub_title for word in ['지니', '스포티파이']):
+                recommended_subscription = sub
+                break
+        elif any(word in content_type for word in ['스포츠']):
+            if 'u+모바일' in sub_title:
+                recommended_subscription = sub
+                break
+        elif any(word in content_type for word in ['독서', '책']):
+            if '리디' in sub_title:
+                recommended_subscription = sub
+                break
+
+    # 기본 추천 (매칭되지 않은 경우)
+    if not recommended_subscription and subscriptions:
+        recommended_subscription = subscriptions[0]  # 첫 번째 구독 서비스
+
+    # 라이프 브랜드 추천 로직
+    for brand in brands:
+        brand_name = brand.name.lower()
+        brand_category = brand.category.lower()
+
+        # 선호도 기반 매칭
+        if any(word in preference for word in ['커피', '카페', '스타벅스']):
+            if '스타벅스' in brand_name:
+                recommended_brand = brand
+                break
+        elif any(word in preference for word in ['영화', '극장']):
+            if any(word in brand_name for word in ['cgv', '롯데시네마']):
+                recommended_brand = brand
+                break
+        elif any(word in preference for word in ['화장품', '뷰티']):
+            if '올리브영' in brand_name:
+                recommended_brand = brand
+                break
+
+    # 기본 추천 (매칭되지 않은 경우)
+    if not recommended_brand and brands:
+        recommended_brand = brands[0]  # 그냥 첫 번째 브랜드
+
+    return {
+        "subscription": recommended_subscription,
+        "brand": recommended_brand
+    }
+
+async def get_final_subscription_recommendation(req: ChatRequest, user_info: dict, tone: str = "general") -> Callable[[], Awaitable[str]]:
+    """최종 구독 서비스 추천 - 카드 데이터 전송 제거, 순수 AI 응답만"""
+    print(f"[DEBUG] get_final_subscription_recommendation - tone: {tone}")
+    print(f"[DEBUG] user_info: {user_info}")
+
+    try:
+        session = get_session(req.session_id)
+        main_items = get_products_from_db()
+        life_items = get_life_brands_from_db()
+
+        merged_info = {
+            "content_type": "미설정", "device_usage": "미설정",
+            "time_usage": "미설정", "preference": "미설정",
+            **user_info
+        }
+
+        main_text = "\n\n".join([f"- {s.title} ({s.category}) - {format_price(s.price)}" for s in main_items[:4]])
+        life_text = "\n\n".join([f"- {b.name}" for b in life_items[:4]])
+
+        # 프롬프트 템플릿 사용
+        from app.prompts.subscription_prompt import SUBSCRIPTION_PROMPT
+
+        prompt_text = SUBSCRIPTION_PROMPT[tone].format(
+            message="\n\n".join([f"- {k}: {v}" for k, v in merged_info.items()]),
+            main=main_text,
+            life=life_text,
+            history=""
+        )
+
+        model = get_chat_model()
+
+        async def stream():
+            generated_response = ""
+            try:
+                # AI 응답을 바로 스트리밍
+                async for chunk in model.astream(prompt_text):
+                    if chunk and hasattr(chunk, 'content') and chunk.content:
+                        generated_response += chunk.content
+                        yield chunk.content
+                        await asyncio.sleep(0.01)
+
+                # 최종 추천 완료 처리
+                session["history"].append({"role": "assistant", "content": generated_response})
+                session["last_recommendation_type"] = "subscription"
+                # 플로우 완전 초기화
+                session.pop("subscription_flow_step", None)
+                session.pop("subscription_step", None)
+                session.pop("user_info", None)
+                session.pop("subscription_info", None)
+                save_session(req.session_id, session)
+
+                print(f"[DEBUG] Subscription recommendation completed, flow reset")
+
+            except Exception as e:
+                print(f"[ERROR] Final subscription recommendation failed: {e}")
+                error_msg = "구독 서비스 추천 중 문제가 발생했어요. 😅" if tone == "general" else "앗! 추천하다가 뭔가 꼬였어! 😅"
+                yield error_msg
+
+        return stream
+
+    except Exception as e:
+        print(f"[ERROR] Final subscription recommendation setup failed: {e}")
+        error_text = "구독 서비스 추천 준비 중 문제가 발생했어요. 😅"
+        return create_simple_stream(error_text)
