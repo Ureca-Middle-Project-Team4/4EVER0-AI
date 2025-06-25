@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import time
 
 from app.api.chat import router as chat_router
 from app.api.usage import router as usage_router
@@ -9,7 +10,7 @@ from app.api.chat_like import router as chat_like_router
 from app.api.ubti import router as ubti_router
 from app.api.user import router as user_router
 from app.db.database import engine, Base
-from app.utils.redis_client import get_redis_memory_info, emergency_cleanup
+from app.utils.redis_client import get_redis_memory_info, emergency_cleanup,get_user_capacity_info, get_capacity_recommendation
 
 
 @asynccontextmanager
@@ -45,6 +46,8 @@ app.include_router(chat_like_router, prefix="/api", tags=["좋아요 기반 추�
 app.include_router(ubti_router, prefix="/api", tags=["UBTI 분석"])
 app.include_router(user_router, prefix="/api", tags=["사용자 관리"])
 
+
+
 @app.get("/", tags=["기본정보"])
 async def root():
     """API 기본 정보 및 엔드포인트 안내"""
@@ -60,6 +63,7 @@ async def root():
             "UBTI 질문": "/api/ubti/question",
             "UBTI 결과": "/api/ubti/result",
             "사용자 조회": "/api/users/{user_id}",
+            "용량 상태": "/capacity/status",  # 추가
         },
     }
 
@@ -95,6 +99,11 @@ async def redis_cleanup():
         "success": success,
         "message": "모든 세션이 삭제되었습니다" if success else "정리 실패"
     }
+
+@app.get("/capacity/status", tags=["용량 모니터링"])
+async def capacity_status():
+    """실시간 사용자 수용 능력 분석"""
+    return get_user_capacity_info()
 
 @app.get("/health/detailed", tags=["헬스체크"])
 async def detailed_health():
