@@ -1,4 +1,4 @@
-# chatbot-server/app/api/usage.py - 완전 수정된 버전
+# chatbot-server/app/api/usage.py - 더미데이터 생성 및 카드 전송 추가
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -7,15 +7,86 @@ from app.db.user_usage_db import get_user_current_usage
 from app.db.plan_db import get_all_plans
 import json
 import asyncio
+import random
 
 router = APIRouter()
 
-def _analyze_usage_pattern(usage) -> str:
-    """사용 패턴 분석"""
-    if not usage:
-        return "unknown"
+def generate_random_usage_data(user_id: int) -> dict:
+    """사용자 ID 기반 랜덤 사용량 데이터 생성"""
 
-    usage_pct = usage.usage_percentage
+    # 시드 설정으로 동일한 user_id는 항상 같은 데이터 생성
+    random.seed(user_id)
+
+    # 다양한 요금제 패턴
+    plan_patterns = [
+        {"name": "너겟 30", "price": 30000, "total_data": 8000, "total_voice": 300, "total_sms": 999999},
+        {"name": "너겟 32", "price": 32000, "total_data": 12000, "total_voice": 300, "total_sms": 999999},
+        {"name": "너겟 34", "price": 34000, "total_data": 15000, "total_voice": 300, "total_sms": 999999},
+        {"name": "너겟 36", "price": 36000, "total_data": 20000, "total_voice": 300, "total_sms": 999999},
+        {"name": "라이트 23", "price": 23000, "total_data": 3000, "total_voice": 300, "total_sms": 999999},
+        {"name": "라이트 25", "price": 25000, "total_data": 5000, "total_voice": 300, "total_sms": 999999},
+        {"name": "프리미엄 50", "price": 50000, "total_data": 999999, "total_voice": 999999, "total_sms": 999999},
+    ]
+
+    # 랜덤 요금제 선택
+    current_plan = random.choice(plan_patterns)
+
+    # 사용량 패턴별 생성 (user_id % 4로 패턴 결정)
+    usage_pattern = user_id % 4
+
+    if usage_pattern == 0:  # 헤비 사용자
+        data_usage_rate = random.uniform(0.85, 0.98)  # 85-98% 사용
+        voice_usage_rate = random.uniform(0.7, 0.95)
+        sms_usage_rate = random.uniform(0.3, 0.7)
+    elif usage_pattern == 1:  # 안정형 사용자
+        data_usage_rate = random.uniform(0.65, 0.85)  # 65-85% 사용
+        voice_usage_rate = random.uniform(0.4, 0.7)
+        sms_usage_rate = random.uniform(0.2, 0.5)
+    elif usage_pattern == 2:  # 절약형 사용자
+        data_usage_rate = random.uniform(0.15, 0.40)  # 15-40% 사용
+        voice_usage_rate = random.uniform(0.1, 0.4)
+        sms_usage_rate = random.uniform(0.05, 0.3)
+    else:  # 라이트 사용자
+        data_usage_rate = random.uniform(0.05, 0.25)  # 5-25% 사용
+        voice_usage_rate = random.uniform(0.05, 0.3)
+        sms_usage_rate = random.uniform(0.02, 0.2)
+
+    # 사용량 계산
+    used_data = int(current_plan["total_data"] * data_usage_rate)
+    used_voice = int(current_plan["total_voice"] * voice_usage_rate)
+    used_sms = int(current_plan["total_sms"] * sms_usage_rate) if current_plan["total_sms"] != 999999 else random.randint(10, 100)
+
+    # 남은 용량 계산
+    remaining_data = max(0, current_plan["total_data"] - used_data)
+    remaining_voice = max(0, current_plan["total_voice"] - used_voice)
+    remaining_sms = max(0, current_plan["total_sms"] - used_sms) if current_plan["total_sms"] != 999999 else 999999
+
+    # 전체 사용률 계산 (데이터 60%, 음성 30%, SMS 10% 가중치)
+    data_percentage = (used_data / current_plan["total_data"]) * 100 if current_plan["total_data"] > 0 else 0
+    voice_percentage = (used_voice / current_plan["total_voice"]) * 100 if current_plan["total_voice"] > 0 else 0
+    sms_percentage = (used_sms / current_plan["total_sms"]) * 100 if current_plan["total_sms"] != 999999 else 5
+
+    usage_percentage = data_percentage * 0.6 + voice_percentage * 0.3 + sms_percentage * 0.1
+
+    return {
+        "user_id": user_id,
+        "current_plan_name": current_plan["name"],
+        "current_plan_price": current_plan["price"],
+        "remaining_data": remaining_data,
+        "remaining_voice": remaining_voice,
+        "remaining_sms": remaining_sms,
+        "usage_percentage": round(usage_percentage, 1),
+        "used_data": used_data,
+        "used_voice": used_voice,
+        "used_sms": used_sms,
+        "total_data": current_plan["total_data"],
+        "total_voice": current_plan["total_voice"],
+        "total_sms": current_plan["total_sms"]
+    }
+
+def _analyze_usage_pattern(usage_data: dict) -> str:
+    """사용 패턴 분석"""
+    usage_pct = usage_data["usage_percentage"]
 
     if usage_pct >= 95:
         return "urgent_upgrade"
@@ -30,12 +101,12 @@ def _analyze_usage_pattern(usage) -> str:
     else:
         return "alternative"
 
-def _filter_plans_by_usage(all_plans: list, usage, recommendation_type: str) -> list:
+def _filter_plans_by_usage(all_plans: list, usage_data: dict, recommendation_type: str) -> list:
     """사용 패턴에 따른 요금제 필터링"""
     if not all_plans:
         return []
 
-    current_price = usage.current_plan_price if usage else 35000
+    current_price = usage_data["current_plan_price"]
 
     def safe_price(plan):
         try:
@@ -57,7 +128,6 @@ def _filter_plans_by_usage(all_plans: list, usage, recommendation_type: str) -> 
     elif recommendation_type == "cost_optimize":
         return [p for p in all_plans if safe_price(p) <= current_price][:3]
     else:  # alternative or unknown
-        # 기본 인기 요금제 반환
         return all_plans[:2] if len(all_plans) >= 2 else all_plans
 
 def _safe_price_value(price) -> int:
@@ -83,48 +153,19 @@ def _analyze_user_type(usage_pct: float, data_gb: float, voice_min: int) -> str:
     else:
         return "라이트 사용자"
 
-def _generate_no_data_message(tone: str = "general") -> str:
-    """사용량 데이터가 없을 때 안내 메시지"""
-    if tone == "muneoz":
-        return """어? 너의 사용량 데이터를 못 찾겠어! 😅
+def _generate_simple_explanation(usage_data: dict, recommendation_type: str, recommended_plans: list, tone: str) -> str:
+    """사용자 친화적 설명 생성"""
 
-아직 요금제를 가입하지 않았거나,
-데이터가 준비되지 않은 것 같아!
-
-이런 걸 해봐:
-📱 **요금제를 먼저 가입해보고**
-📊 **며칠 사용한 후에** 다시 와줘!
-
-지금은 일반 채팅으로 "요금제 추천해줘"라고 하면
-네 상황에 맞는 추천을 받을 수 있어~ 🐙💜"""
-    else:
-        return """사용량 데이터를 찾을 수 없습니다. 😔
-
-다음과 같은 경우일 수 있어요:
-• 아직 요금제를 가입하지 않으신 경우
-• 가입 후 충분한 사용 데이터가 쌓이지 않은 경우
-
-권장사항:
-📱 **요금제 가입 후 며칠 사용해보시기**
-💬 **일반 채팅으로 "요금제 추천해주세요"**라고
-   말씀해주시면 기본 상담을 받으실 수 있어요!
-
-사용량이 쌓인 후 다시 이용해주시면
-더 정확한 맞춤 추천을 받으실 수 있습니다. 😊"""
-
-def _generate_simple_explanation(usage, recommendation_type: str, recommended_plans: list, tone: str) -> str:
-    """사용자 친화적 설명 생성 - 사용자 타입 분석 + 구체적 이익/절약 금액"""
-
-    if not usage or not recommended_plans:
+    if not usage_data or not recommended_plans:
         return _generate_no_data_message(tone)
 
-    usage_pct = usage.usage_percentage
-    current_plan = usage.current_plan_name
-    data_gb = usage.remaining_data / 1000
-    current_price = usage.current_plan_price
+    usage_pct = usage_data["usage_percentage"]
+    current_plan = usage_data["current_plan_name"]
+    data_gb = usage_data["remaining_data"] / 1000
+    current_price = usage_data["current_plan_price"]
 
     # 사용자 타입 분석
-    user_type = _analyze_user_type(usage_pct, data_gb, usage.remaining_voice)
+    user_type = _analyze_user_type(usage_pct, data_gb, usage_data["remaining_voice"])
 
     # 추천 요금제 최고 가격과 최저 가격
     plan_prices = [_safe_price_value(plan.price) for plan in recommended_plans]
@@ -265,20 +306,50 @@ def _generate_simple_explanation(usage, recommendation_type: str, recommended_pl
 
 고객님의 사용 습관에 가장 적합한 요금제를 선택하시면 됩니다."""
 
+def _generate_no_data_message(tone: str = "general") -> str:
+    """사용량 데이터가 없을 때 안내 메시지"""
+    if tone == "muneoz":
+        return """어? 너의 사용량 데이터를 못 찾겠어! 😅
+
+아직 요금제를 가입하지 않았거나,
+데이터가 준비되지 않은 것 같아!
+
+이런 걸 해봐:
+📱 **요금제를 먼저 가입해보고**
+📊 **며칠 사용한 후에** 다시 와줘!
+
+지금은 일반 채팅으로 "요금제 추천해줘"라고 하면
+네 상황에 맞는 추천을 받을 수 있어~ 🐙💜"""
+    else:
+        return """사용량 데이터를 찾을 수 없습니다. 😔
+
+다음과 같은 경우일 수 있어요:
+• 아직 요금제를 가입하지 않으신 경우
+• 가입 후 충분한 사용 데이터가 쌓이지 않은 경우
+
+권장사항:
+📱 **요금제 가입 후 며칠 사용해보시기**
+💬 **일반 채팅으로 "요금제 추천해주세요"**라고
+   말씀해주시면 기본 상담을 받으실 수 있어요!
+
+사용량이 쌓인 후 다시 이용해주시면
+더 정확한 맞춤 추천을 받으실 수 있습니다. 😊"""
+
 @router.post("/usage/recommend", summary="사용량 기반 추천", description="사용자의 실제 사용량 데이터를 분석하여 최적의 요금제를 추천합니다.")
 async def usage_based_recommendation(
     user_id: int = Query(..., description="사용자 ID"),
     tone: str = Query("general", description="응답 톤 (general: 정중한 말투, muneoz: 친근한 말투)")
 ):
     """
-    사용자 사용량 기반 요금제 추천 - 스트리밍 지원
+    사용자 사용량 기반 요금제 추천 - 스트리밍 지원 + 더미데이터 생성
     """
     async def generate_stream():
         try:
             print(f"[DEBUG] Usage recommendation request - user_id: {user_id}, tone: {tone}")
 
-            # 1. 사용자 정보 존재 여부 확인
-            user_usage = get_user_current_usage(user_id)
+            # 1. 🔥 더미 사용량 데이터 생성
+            usage_data = generate_random_usage_data(user_id)
+            print(f"[DEBUG] Generated usage data for user {user_id}: {usage_data['usage_percentage']:.1f}% usage")
 
             # 2. 전체 요금제 목록 조회
             all_plans = get_all_plans()
@@ -290,49 +361,31 @@ async def usage_based_recommendation(
                 yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
                 return
 
-            # 3. 사용자 정보가 없을 때 - 카드 없이 안내 메시지만
-            if not user_usage:
-                print(f"[WARNING] User {user_id} not found, providing guidance message")
-
-                # 스트리밍 시작 신호
-                yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.05)
-
-                # 안내 메시지 스트리밍
-                guidance_message = _generate_no_data_message(tone)
-                words = guidance_message.split(' ')
-                for i, word in enumerate(words):
-                    chunk_data = {
-                        "type": "message_chunk",
-                        "content": word + (" " if i < len(words) - 1 else "")
-                    }
-                    yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.05)
-
-                # 스트리밍 완료 신호
-                yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"
-                return
-
-            # 4. 정상 사용자 처리
-            # 사용량 분석 결과 먼저 전송
+            # 3. 🔥 사용량 분석 카드 데이터 먼저 전송
             usage_summary = {
                 "type": "usage_analysis",
                 "data": {
                     "user_id": user_id,
-                    "current_plan": user_usage.current_plan_name,
-                    "current_price": user_usage.current_plan_price,
-                    "remaining_data": user_usage.remaining_data,
-                    "remaining_voice": user_usage.remaining_voice,
-                    "remaining_sms": user_usage.remaining_sms,
-                    "usage_percentage": round(user_usage.usage_percentage, 1)
+                    "current_plan": usage_data["current_plan_name"],
+                    "current_price": usage_data["current_plan_price"],
+                    "remaining_data": usage_data["remaining_data"],
+                    "remaining_voice": usage_data["remaining_voice"],
+                    "remaining_sms": usage_data["remaining_sms"],
+                    "usage_percentage": usage_data["usage_percentage"],
+                    "used_data": usage_data["used_data"],
+                    "used_voice": usage_data["used_voice"],
+                    "used_sms": usage_data["used_sms"],
+                    "total_data": usage_data["total_data"],
+                    "total_voice": usage_data["total_voice"],
+                    "total_sms": usage_data["total_sms"]
                 }
             }
             yield f"data: {json.dumps(usage_summary, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.1)
 
-            # 5. 추천 요금제 카드 데이터 전송
-            recommendation_type = _analyze_usage_pattern(user_usage)
-            recommended_plans = _filter_plans_by_usage(all_plans, user_usage, recommendation_type)
+            # 4. 추천 요금제 분석 및 카드 데이터 전송
+            recommendation_type = _analyze_usage_pattern(usage_data)
+            recommended_plans = _filter_plans_by_usage(all_plans, usage_data, recommendation_type)
 
             if recommended_plans:
                 plan_data = {
@@ -356,12 +409,12 @@ async def usage_based_recommendation(
                 yield f"data: {json.dumps(plan_data, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.1)
 
-            # 6. 스트리밍 시작 신호
+            # 5. 스트리밍 시작 신호
             yield f"data: {json.dumps({'type': 'message_start'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.05)
 
-            # 7. 맞춤 설명 스트리밍
-            simple_explanation = _generate_simple_explanation(user_usage, recommendation_type, recommended_plans, tone)
+            # 6. 맞춤 설명 스트리밍
+            simple_explanation = _generate_simple_explanation(usage_data, recommendation_type, recommended_plans, tone)
 
             words = simple_explanation.split(' ')
             for i, word in enumerate(words):
@@ -372,7 +425,7 @@ async def usage_based_recommendation(
                 yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.05)
 
-            # 8. 스트리밍 완료 신호
+            # 7. 스트리밍 완료 신호
             yield f"data: {json.dumps({'type': 'message_end'}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
@@ -391,44 +444,44 @@ async def usage_based_recommendation(
 @router.get("/usage/{user_id}", summary="사용량 조회", description="특정 사용자의 현재 요금제 사용량 및 상태를 조회합니다.")
 async def get_user_usage(user_id: int):
     """
-    사용자 사용량 조회 - 실제 DB 연동
+    사용자 사용량 조회 - 더미데이터 기반
     """
     try:
-        # 실제 DB에서 사용량 데이터 조회
-        user_usage = get_user_current_usage(user_id)
-
-        if not user_usage:
-            # 데이터가 없을 때는 404 반환
-            return {
-                "success": False,
-                "message": f"사용자 {user_id}의 사용량 데이터를 찾을 수 없습니다.",
-                "data": None
-            }
+        # 🔥 더미데이터 생성
+        usage_data = generate_random_usage_data(user_id)
 
         # 응답 데이터 구성
-        usage_data = {
-            "user_id": user_usage.user_id,
+        response_data = {
+            "user_id": usage_data["user_id"],
             "current_plan": {
-                "name": user_usage.current_plan_name,
-                "price": user_usage.current_plan_price
+                "name": usage_data["current_plan_name"],
+                "price": usage_data["current_plan_price"]
             },
             "remaining": {
-                "data": f"{user_usage.remaining_data}MB",
-                "voice": f"{user_usage.remaining_voice}분",
-                "sms": f"{user_usage.remaining_sms}건"
+                "data": f"{usage_data['remaining_data']}MB",
+                "voice": f"{usage_data['remaining_voice']}분",
+                "sms": f"{usage_data['remaining_sms']}건"
             },
-            "usage_percentage": user_usage.usage_percentage,
-            "status": _get_usage_status(user_usage.usage_percentage)
+            "used": {
+                "data": f"{usage_data['used_data']}MB",
+                "voice": f"{usage_data['used_voice']}분",
+                "sms": f"{usage_data['used_sms']}건"
+            },
+            "total": {
+                "data": f"{usage_data['total_data']}MB",
+                "voice": f"{usage_data['total_voice']}분",
+                "sms": f"{usage_data['total_sms']}건"
+            },
+            "usage_percentage": usage_data["usage_percentage"],
+            "status": _get_usage_status(usage_data["usage_percentage"])
         }
 
         return {
             "success": True,
             "message": "사용량 조회 성공",
-            "data": usage_data
+            "data": response_data
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
         print(f"[ERROR] Usage data retrieval failed: {e}")
         return {
