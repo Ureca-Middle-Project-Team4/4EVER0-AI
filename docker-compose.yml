@@ -1,11 +1,11 @@
 services:
   chatbot-server:
-    build:
-      context: ./chatbot-server
+    image: knyoung/chatbot-server:latest
     container_name: chatbot-server
     ports:
       - "8000:8000"
     env_file:
+      - ./.env
       - ./chatbot-server/.env
     depends_on:
       - redis-ai
@@ -13,7 +13,7 @@ services:
     restart: always
     networks:
       - 4ever0_net
-
+      
   redis-ai:
     image: redis:7
     container_name: redis-ai
