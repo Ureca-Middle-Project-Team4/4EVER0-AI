@@ -1,0 +1,82 @@
+# .github/workflows/ci.yml
+name: Python CI & CD for Chatbot-Server
+
+on:
+  push:
+    branches: [ "dev" ]
+  pull_request:
+    branches: [ "dev" ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r chatbot-server/requirements.txt
+
+      - name: 린터 실행 (flake8)
+        run: |
+          cd chatbot-server
+          flake8 .
+
+      - name: 단위 테스트 실행 (pytest)
+        run: |
+          cd chatbot-server
+          pytest --maxfail=1 --disable-warnings -q
+
+  build-and-push:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 이미지 빌드 및 태그 달기
+        run: |
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/chatbot-server
+          SHA_TAG=${{ github.sha }}
+          docker build \
+            -f chatbot-server/Dockerfile \
+            -t $IMAGE:$SHA_TAG \
+            -t $IMAGE:latest \
+            ./chatbot-server
+
+      - name: 이미지 푸시
+        run: |
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/chatbot-server
+          SHA_TAG=${{ github.sha }}
+          docker push $IMAGE:$SHA_TAG
+          docker push $IMAGE:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: EC2에 SSH 연결 및 배포
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            cd ~/4EVER0-AI
+            git pull origin main
+            docker-compose pull
+            docker-compose up -d --remove-orphans
