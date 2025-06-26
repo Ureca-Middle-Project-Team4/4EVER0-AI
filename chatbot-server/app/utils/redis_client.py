@@ -7,15 +7,15 @@ from typing import Dict
 redis_host = os.getenv("REDIS_HOST", "redis-ai")
 redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
-# 현실적 최적화 (멀티턴 체인 보장)
-MEMORY_LIMIT_MB = int(os.getenv("REDIS_MEMORY_LIMIT_MB", "20"))  # 50→20MB
-SESSION_TTL = int(os.getenv("SESSION_TTL", "300"))  # 600→300초 (5분)
-MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "80"))  # 500→80개
+# 8GB 환경에 맞게 설정값만 변경
+MEMORY_LIMIT_MB = int(os.getenv("REDIS_MEMORY_LIMIT_MB", "2048"))  # 2GB
+SESSION_TTL = int(os.getenv("SESSION_TTL", "1800"))  # 300초 → 1800초 (30분)
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "3000"))  # 80개 → 3000개
 
 print(f"[INFO] Redis 최적화: 메모리={MEMORY_LIMIT_MB}MB / TTL={SESSION_TTL}s / 최대={MAX_SESSIONS}개")
 
 def create_redis_client():
-    """Redis 클라이언트 - 기존 로직 호환"""
+    """Redis 클라이언트 - 8GB 환경 커넥션 풀 최적화"""
     for host in [redis_host, "localhost"]:
         try:
             client = redis.Redis(
@@ -24,7 +24,7 @@ def create_redis_client():
                 decode_responses=True,
                 socket_connect_timeout=3,
                 socket_timeout=3,
-                max_connections=15,  # 연결 제한 추가
+                max_connections=50,  # 15개 → 50개
             )
             client.ping()
 
@@ -63,16 +63,16 @@ def safe_clean_session_data(data: dict) -> dict:
     for k, v in data.items():
         if k in essential_keys:
             if k == 'history' and isinstance(v, list):
-                # 히스토리만 제한 (기존 10개 → 6개)
-                cleaned[k] = v[-6:] if len(v) > 6 else v
+                # 8GB 환경에서는 히스토리 더 많이 보존: 6개 → 15개
+                cleaned[k] = v[-15:] if len(v) > 15 else v
             elif k in ['user_info', 'plan_info', 'subscription_info', 'ubti_info'] and isinstance(v, dict):
                 # 사용자 정보는 길이만 제한
                 compressed_info = {}
                 for uk, uv in v.items():
                     if uv:
-                        # 긴 텍스트만 자르기 (100자 초과시)
-                        if isinstance(uv, str) and len(uv) > 100:
-                            compressed_info[uk] = uv[:100]
+                        # 8GB 환경에서는 텍스트 길이 제한 완화: 100자 → 300자
+                        if isinstance(uv, str) and len(uv) > 300:
+                            compressed_info[uk] = uv[:300]
                         else:
                             compressed_info[uk] = uv
                 cleaned[k] = compressed_info
@@ -104,28 +104,31 @@ def save_session(session_id: str, data: dict):
         cleaned = safe_clean_session_data(data)
         json_data = json.dumps(cleaned, ensure_ascii=False, separators=(',', ':'))
 
-        # 크기 모니터링 (경고만, 강제 삭제 안함)
+        # 크기 모니터링
         size_kb = len(json_data) / 1024
 
-        if size_kb > 10.0:
+        # 멀티턴 진행 중이면 TTL 2배 연장
+        multiturn_keys = ['phone_plan_flow_step', 'subscription_flow_step', 'ubti_step']
+        is_multiturn = any(key in cleaned and cleaned[key] > 0 for key in multiturn_keys)
+
+        if is_multiturn:
+            ttl = SESSION_TTL * 2
+            print(f"[DEBUG] 멀티턴 진행 중 - TTL 연장: {ttl}초")
+        elif size_kb > 10.0:
             print(f"[WARNING] 세션 크기 과대 ({size_kb:.1f}KB) - {session_id}")
-            # 강제 삭제 대신 히스토리만 더 줄임
-            if 'history' in cleaned and isinstance(cleaned['history'], list):
-                cleaned['history'] = cleaned['history'][-3:]  # 3개만 유지
+            if 'history' in cleaned and isinstance(cleaned['history'], list) and len(cleaned['history']) > 10:
+                cleaned['history'] = cleaned['history'][-8:]  # 3개 → 8개로 완화
                 json_data = json.dumps(cleaned, ensure_ascii=False, separators=(',', ':'))
                 size_kb = len(json_data) / 1024
                 print(f"[INFO] 히스토리 압축 후: {size_kb:.1f}KB")
-
-        # 동적 TTL
-        if size_kb > 3.0:
-            ttl = SESSION_TTL // 2  # 큰 세션은 짧은 TTL
+            ttl = SESSION_TTL
         else:
             ttl = SESSION_TTL
 
         client.set(session_id, json_data, ex=ttl)
 
-        # 주기적 정리 (덜 빈번하게)
-        if hash(session_id) % 15 == 0:  # 15번에 1번
+        # 8GB 환경에서는 정리 빈도 감소: 15번에 1번 → 30번에 1번
+        if hash(session_id) % 30 == 0:
             cleanup_old_sessions()
 
         print(f"[DEBUG] 세션 저장: {session_id} ({size_kb:.1f}KB, TTL={ttl}s)")
@@ -134,23 +137,23 @@ def save_session(session_id: str, data: dict):
         print(f"[ERROR] 세션 저장 실패: {e}")
 
 def cleanup_old_sessions():
-    """안전한 세션 정리 - 만료된 것만"""
+    """안전한 세션 정리 - 8GB 환경에서는 더 보수적"""
     if not client:
         return
     try:
         total_sessions = client.dbsize()
 
-        # 세션이 60개 초과시 정리
-        if total_sessions > 60:
+        # 8GB 환경에서는 1500개 초과시만 정리
+        if total_sessions > 1500:
             print(f"[INFO] 세션 정리 시작 (현재: {total_sessions}개)")
 
             keys_to_delete = []
-            for key in client.scan_iter(count=30):
+            for key in client.scan_iter(count=50):  # 스캔 범위 확대
                 ttl = client.ttl(key)
-                # TTL이 30초 미만이거나 이미 만료된 키만 삭제
-                if ttl < 30 or ttl == -1:
+                # TTL이 60초 미만이거나 이미 만료된 키만 삭제 (30초 → 60초로 완화)
+                if ttl < 60 or ttl == -1:
                     keys_to_delete.append(key)
-                    if len(keys_to_delete) >= 15:  # 한 번에 15개까지
+                    if len(keys_to_delete) >= 30:  # 한 번에 30개까지 (15개 → 30개)
                         break
 
             if keys_to_delete:
@@ -206,8 +209,8 @@ def get_user_capacity_info():
     else:
         avg_memory_per_session = 0.5  # 기본값
 
-    # 수용 가능 사용자 수 계산
-    available_memory = 20 - used_mb  # 20MB 한도
+    # 8GB 환경에 맞게 수용 가능 사용자 수 계산
+    available_memory = MEMORY_LIMIT_MB - used_mb  # 2GB 한도
     max_additional_users = int(available_memory / avg_memory_per_session)
 
     # 현재 + 추가 가능
