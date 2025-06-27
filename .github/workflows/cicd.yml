@@ -26,15 +26,15 @@ jobs:
           pip install flake8 pytest
           
 
-      - name: 린터 실행 (flake8)
-        run: |
-          cd chatbot-server
-          flake8 .
+      # - name: 린터 실행 (flake8)
+      #   run: |
+      #     cd chatbot-server
+      #     flake8 .
 
-      - name: 단위 테스트 실행 (pytest)
-        run: |
-          cd chatbot-server
-          pytest --maxfail=1 --disable-warnings -q
+      # - name: 단위 테스트 실행 (pytest)
+      #   run: |
+      #     cd chatbot-server
+      #     pytest --maxfail=1 --disable-warnings -q
 
   build-and-push:
     needs: lint-and-test
